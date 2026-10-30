@@ -51,3 +51,12 @@ export const ERROR_TYPES = [
   "syntax_error",
   "none"
 ];
+
+export default {
+  TOPICS,
+  MEMORY_TYPES,
+  MEMORY_STATUS,
+  MEMORY_SOURCE,
+  EXPLANATION_STYLES,
+  ERROR_TYPES
+};

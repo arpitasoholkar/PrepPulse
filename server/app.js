@@ -10,9 +10,30 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+const clientOrigin = process.env.CLIENT_ORIGIN;
+const allowedOrigins = clientOrigin
+  ? clientOrigin.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || '*',
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow server-to-server or non-browser tools (curl, Postman)
+    if (!origin) return callback(null, true);
+
+    // Allow configured origins or any *.vercel.app deployment
+    if (
+      !clientOrigin ||
+      clientOrigin === '*' ||
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin)
+    ) {
+      return callback(null, origin);
+    }
+    return callback(null, origin);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 
 app.use(express.json());

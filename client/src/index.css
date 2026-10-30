@@ -7,3 +7,13 @@ body {
   background-color: #020617;
   color: #f8fafc;
 }
+
+/* Modal containment per modern-web-guidance */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}

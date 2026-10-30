@@ -1,43 +1,98 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 import Memory from '../models/Memory.js';
 import TopicMastery from '../models/TopicMastery.js';
 import CodingAttempt from '../models/CodingAttempt.js';
+import ChatSession from '../models/ChatSession.js';
 import { TOPICS } from '../constants.js';
+import { connectDB } from '../db.js';
 
-export async function runSeedForUser(userId) {
-  // Wipe existing user data
-  await Memory.deleteMany({ userId });
-  await TopicMastery.deleteMany({ userId });
-  await CodingAttempt.deleteMany({ userId });
+/**
+ * Populates demo baseline data for a given user:
+ * - Mastery records for all 10 topics
+ * - 9 baseline memories (recursion weakness, visual preference, strong arrays, near-expiry revision_needed, superseded weakness)
+ * - 8 past coding attempts
+ *
+ * @param {string|mongoose.Types.ObjectId} userId
+ * @returns {Promise<{ ok: boolean, memoriesSeeded: number, masteriesSeeded: number, attemptsSeeded: number }>}
+ */
+export async function seedUser(userId) {
+  // Wipe existing user data across collections to run safely
+  await Promise.all([
+    Memory.deleteMany({ userId }),
+    TopicMastery.deleteMany({ userId }),
+    CodingAttempt.deleteMany({ userId }),
+    ChatSession.deleteMany({ userId })
+  ]);
 
-  // 1. Seed Topic Mastery for all 10 topics
+  // 1. Seed Topic Mastery for all 10 canonical topics
   const masteryEntries = TOPICS.map(topic => {
     let score = 55;
     let attempts = 3;
     let history = [40, 50, 55];
-    if (topic === 'recursion') {
-      score = 42;
-      attempts = 5;
-      history = [30, 35, 42];
-    } else if (topic === 'arrays') {
+
+    if (topic === 'arrays') {
       score = 78;
       attempts = 6;
       history = [60, 70, 78];
+    } else if (topic === 'strings') {
+      score = 65;
+      attempts = 4;
+      history = [45, 55, 65];
+    } else if (topic === 'linked-list') {
+      score = 70;
+      attempts = 4;
+      history = [50, 60, 70];
+    } else if (topic === 'stacks-queues') {
+      score = 72;
+      attempts = 4;
+      history = [55, 65, 72];
+    } else if (topic === 'hashing') {
+      score = 60;
+      attempts = 3;
+      history = [40, 50, 60];
+    } else if (topic === 'sorting') {
+      score = 58;
+      attempts = 3;
+      history = [45, 52, 58];
+    } else if (topic === 'recursion') {
+      score = 42;
+      attempts = 5;
+      history = [30, 35, 42];
+    } else if (topic === 'trees') {
+      score = 38;
+      attempts = 4;
+      history = [25, 30, 38];
+    } else if (topic === 'graphs') {
+      score = 35;
+      attempts = 3;
+      history = [20, 28, 35];
+    } else if (topic === 'dp') {
+      score = 45;
+      attempts = 3;
+      history = [30, 38, 45];
     }
+
     return {
       userId,
       topic,
       masteryScore: score,
       attempts,
-      lastPracticed: new Date(),
+      lastPracticed: new Date(Date.now() - 3600000 * (attempts * 4)),
       history
     };
   });
+
   await TopicMastery.insertMany(masteryEntries);
 
-  // 2. Seed Memories (9 seeded memories as defined in playbook)
+  // 2. Seed 9 Baseline Memories
+  const stringStrengthId = new mongoose.Types.ObjectId();
+
   const seededMemories = [
+    // 1. Weak recursion base case mistake memory
     {
       userId,
       type: 'mistake',
@@ -53,6 +108,7 @@ export async function runSeedForUser(userId) {
       useCount: 3,
       lastUsedAt: new Date(Date.now() - 3600000 * 2)
     },
+    // 2. Weakness on recursion termination conditions
     {
       userId,
       type: 'weakness',
@@ -66,6 +122,7 @@ export async function runSeedForUser(userId) {
       meta: { errorType: 'wrong_base_case' },
       source: 'practice'
     },
+    // 3. Visual learning preference on recursion
     {
       userId,
       type: 'learning_preference',
@@ -79,6 +136,7 @@ export async function runSeedForUser(userId) {
       meta: { style: 'visual' },
       source: 'chat'
     },
+    // 4. Strong arrays topic (proficient two-pointer)
     {
       userId,
       type: 'strength',
@@ -91,6 +149,7 @@ export async function runSeedForUser(userId) {
       status: 'active',
       source: 'practice'
     },
+    // 5. Concept understood on arrays
     {
       userId,
       type: 'concept_understood',
@@ -103,6 +162,7 @@ export async function runSeedForUser(userId) {
       status: 'active',
       source: 'practice'
     },
+    // 6. Near-expiry revision_needed memory (expires in ~6 hours)
     {
       userId,
       type: 'revision_needed',
@@ -113,9 +173,10 @@ export async function runSeedForUser(userId) {
       ],
       confidence: 0.65,
       status: 'active',
-      expiresAt: new Date(Date.now() + 3600000 * 24 * 7), // 7 days TTL
+      expiresAt: new Date(Date.now() + 3600000 * 6), // 6 hours TTL remaining (near-expiry)
       source: 'practice'
     },
+    // 7. Superseded weakness on strings
     {
       userId,
       type: 'weakness',
@@ -126,9 +187,12 @@ export async function runSeedForUser(userId) {
       ],
       confidence: 0.8,
       status: 'superseded',
+      supersededBy: stringStrengthId,
       source: 'practice'
     },
+    // 8. Active strength memory replacing the superseded weakness
     {
+      _id: stringStrengthId,
       userId,
       type: 'strength',
       topic: 'strings',
@@ -140,6 +204,7 @@ export async function runSeedForUser(userId) {
       status: 'active',
       source: 'practice'
     },
+    // 9. Trees mistake memory
     {
       userId,
       type: 'mistake',
@@ -157,7 +222,7 @@ export async function runSeedForUser(userId) {
 
   await Memory.insertMany(seededMemories);
 
-  // 3. Seed Coding Attempts (past 8 attempts)
+  // 3. Seed 8 Past Coding Attempts
   const seededAttempts = [
     {
       userId,
@@ -175,17 +240,133 @@ export async function runSeedForUser(userId) {
       userId,
       questionId: 'arr_binary_search',
       topic: 'arrays',
-      code: 'function binarySearch(nums, target) { ... }',
+      code: 'function binarySearch(nums, target) {\n  let l = 0, r = nums.length - 1;\n  while (l <= r) {\n    let m = Math.floor((l + r) / 2);\n    if (nums[m] === target) return m;\n    if (nums[m] < target) l = m + 1;\n    else r = m - 1;\n  }\n  return -1;\n}',
       result: 'pass',
       errorType: 'none',
-      explanation: 'All tests passed cleanly',
+      explanation: 'All boundary and midpoint tests passed cleanly',
       testsPassed: 5,
       testsTotal: 5,
-      timestamp: new Date(Date.now() - 3600000 * 48)
+      timestamp: new Date(Date.now() - 3600000 * 22)
+    },
+    {
+      userId,
+      questionId: 'str_palindrome',
+      topic: 'strings',
+      code: 'function isPalindrome(s) {\n  let clean = s.toLowerCase();\n  return clean === clean.split("").reverse().join("");\n}',
+      result: 'fail',
+      errorType: 'edge_case_missed',
+      explanation: 'Failed when punctuation or non-alphanumeric chars present',
+      testsPassed: 3,
+      testsTotal: 5,
+      timestamp: new Date(Date.now() - 3600000 * 20)
+    },
+    {
+      userId,
+      questionId: 'str_palindrome',
+      topic: 'strings',
+      code: 'function isPalindrome(s) {\n  let clean = s.toLowerCase().replace(/[^a-z0-9]/g, "");\n  return clean === clean.split("").reverse().join("");\n}',
+      result: 'pass',
+      errorType: 'none',
+      explanation: 'Correct alphanumeric filtering and boundary handling',
+      testsPassed: 5,
+      testsTotal: 5,
+      timestamp: new Date(Date.now() - 3600000 * 18)
+    },
+    {
+      userId,
+      questionId: 'tree_max_depth',
+      topic: 'trees',
+      code: 'function maxDepth(root) {\n  return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));\n}',
+      result: 'fail',
+      errorType: 'wrong_base_case',
+      explanation: 'TypeError: Cannot read properties of null (reading left)',
+      testsPassed: 1,
+      testsTotal: 4,
+      timestamp: new Date(Date.now() - 3600000 * 14)
+    },
+    {
+      userId,
+      questionId: 'll_reverse',
+      topic: 'linked-list',
+      code: 'function reverseList(head) {\n  let prev = null, curr = head;\n  while (curr) {\n    let next = curr.next;\n    curr.next = prev;\n    prev = curr;\n    curr = next;\n  }\n  return prev;\n}',
+      result: 'pass',
+      errorType: 'none',
+      explanation: 'In-place linked list reversal with null boundary check passed',
+      testsPassed: 4,
+      testsTotal: 4,
+      timestamp: new Date(Date.now() - 3600000 * 10)
+    },
+    {
+      userId,
+      questionId: 'stack_valid_parens',
+      topic: 'stacks-queues',
+      code: 'function isValid(s) {\n  const stack = [];\n  const map = { ")": "(", "}": "{", "]": "[" };\n  for (const c of s) {\n    if (map[c]) {\n      if (stack.pop() !== map[c]) return false;\n    } else {\n      stack.push(c);\n    }\n  }\n  return stack.length === 0;\n}',
+      result: 'pass',
+      errorType: 'none',
+      explanation: 'Proper stack bracket matching with balanced check',
+      testsPassed: 6,
+      testsTotal: 6,
+      timestamp: new Date(Date.now() - 3600000 * 6)
+    },
+    {
+      userId,
+      questionId: 'dp_climbing_stairs',
+      topic: 'dp',
+      code: 'function climbStairs(n) {\n  let dp = [1, 2];\n  for (let i = 2; i <= n; i++) dp[i] = dp[i-1] + dp[i-2];\n  return dp[n];\n}',
+      result: 'fail',
+      errorType: 'off_by_one',
+      explanation: 'Off-by-one indexing on boundary case n = 1',
+      testsPassed: 2,
+      testsTotal: 4,
+      timestamp: new Date(Date.now() - 3600000 * 2)
     }
   ];
 
   await CodingAttempt.insertMany(seededAttempts);
 
-  return { ok: true, memoriesSeeded: seededMemories.length };
+  return {
+    ok: true,
+    memoriesSeeded: seededMemories.length,
+    masteriesSeeded: masteryEntries.length,
+    attemptsSeeded: seededAttempts.length
+  };
 }
+
+// Alias for backwards compatibility
+export const runSeedForUser = seedUser;
+
+// Standalone CLI runner (e.g. `npm run seed`)
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (isDirectRun) {
+  dotenv.config();
+  (async () => {
+    try {
+      console.log('Connecting to database for seeding...');
+      await connectDB();
+
+      // Ensure demo user exists
+      let demoUser = await User.findOne({ email: 'demo@intelliprep.dev' });
+      if (!demoUser) {
+        demoUser = await User.create({
+          name: 'Demo Student',
+          email: 'demo@intelliprep.dev',
+          targetRole: 'SDE'
+        });
+        console.log(`Created demo user: ${demoUser._id}`);
+      } else {
+        console.log(`Found existing demo user: ${demoUser._id}`);
+      }
+
+      const result = await seedUser(demoUser._id);
+      console.log('Seed completed successfully:', result);
+      await mongoose.disconnect();
+      process.exit(0);
+    } catch (err) {
+      console.error('Seed execution error:', err);
+      process.exit(1);
+    }
+  })();
+}
+
+export default seedUser;
