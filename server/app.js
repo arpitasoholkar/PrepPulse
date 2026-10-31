@@ -45,10 +45,12 @@ const routeFiles = fs.readdirSync(routesPath).filter(file => file.endsWith('.js'
 for (const file of routeFiles) {
   const routeModule = await import(`./routes/${file}`);
   const routeName = file.replace('.js', '');
-  // Route mount mapping
+  // Route mount mapping:
+  // practice.js defines routes with '/practice/questions' and '/practice/submit',
+  // so it must mount at '/api', not '/api/practice' (which would result in /api/practice/practice/questions)
   let mountPath = `/api/${routeName}`;
   if (routeName === 'practice') {
-    mountPath = '/api/practice';
+    mountPath = '/api';
   } else if (routeName === 'chat') {
     mountPath = '/api/chat';
   }
