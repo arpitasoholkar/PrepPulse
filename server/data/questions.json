@@ -1,87 +1,92 @@
 [
   {
     "id": "rec_sum_digits",
-    "title": "Sum of Digits",
+    "title": "Sum of digits",
     "topic": "recursion",
     "difficulty": "easy",
-    "prompt": "Write a recursive function sumDigits(n) that takes a non-negative integer n and returns the sum of its digits.",
-    "starterCode": "function sumDigits(n) {\n  // your recursive code here\n}",
     "language": "javascript",
+    "prompt": "Write sumDigits(n) recursively. It takes a non-negative integer n and returns the sum of its digits. Example: sumDigits(123) returns 6. Do not use loops or convert to a string.",
+    "starterCode": "function sumDigits(n) {\n  // your code here\n}",
     "tests": [
-      { "input": [123], "expected": 6 },
-      { "input": [0], "expected": 0 },
-      { "input": [9999], "expected": 36 },
-      { "input": [5], "expected": 5 },
-      { "input": [10001], "expected": 2 }
+      { "input": "sumDigits(123)", "expected": "6" },
+      { "input": "sumDigits(0)", "expected": "0" },
+      { "input": "sumDigits(9)", "expected": "9" },
+      { "input": "sumDigits(505)", "expected": "10" },
+      { "input": "sumDigits(99999)", "expected": "45" }
     ],
-    "commonBug": "Missing base case for n === 0 causing maximum call stack size exceeded"
+    "commonBug": "No base case, so the function never stops when n becomes 0 (infinite recursion or NaN).",
+    "commonErrorType": "wrong_base_case"
   },
   {
     "id": "arr_binary_search",
-    "title": "Binary Search",
+    "title": "Binary search",
     "topic": "arrays",
     "difficulty": "easy",
-    "prompt": "Write a function binarySearch(nums, target) that returns the index of target in sorted array nums, or -1 if not found.",
-    "starterCode": "function binarySearch(nums, target) {\n  // your code here\n}",
     "language": "javascript",
+    "prompt": "Write binarySearch(arr, target) for a sorted array of numbers. Return the index of target, or -1 if it is not present. Use binary search, not a linear scan.",
+    "starterCode": "function binarySearch(arr, target) {\n  // your code here\n}",
     "tests": [
-      { "input": [[-1,0,3,5,9,12], 9], "expected": 4 },
-      { "input": [[-1,0,3,5,9,12], 2], "expected": -1 },
-      { "input": [[5], 5], "expected": 0 },
-      { "input": [[], 1], "expected": -1 },
-      { "input": [[1,2,3,4], 4], "expected": 3 }
+      { "input": "binarySearch([1,3,5,7,9], 7)", "expected": "3" },
+      { "input": "binarySearch([1,3,5,7,9], 1)", "expected": "0" },
+      { "input": "binarySearch([1,3,5,7,9], 9)", "expected": "4" },
+      { "input": "binarySearch([], 5)", "expected": "-1" },
+      { "input": "binarySearch([2,4], 4)", "expected": "1" }
     ],
-    "commonBug": "Off-by-one error using left < right instead of left <= right or wrong mid index update"
+    "commonBug": "Off-by-one in the loop condition or bounds (for example while (lo < hi) or hi = arr.length), so the last element is missed.",
+    "commonErrorType": "off_by_one"
   },
   {
     "id": "str_palindrome",
-    "title": "Valid Palindrome",
+    "title": "Valid palindrome",
     "topic": "strings",
     "difficulty": "easy",
-    "prompt": "Write a function isPalindrome(s) that returns true if the string is a palindrome considering alphanumeric characters only and ignoring cases.",
-    "starterCode": "function isPalindrome(s) {\n  // your code here\n}",
     "language": "javascript",
+    "prompt": "Write isPalindrome(s). Return true if s reads the same forwards and backwards, ignoring upper/lower case and ignoring every character that is not a letter or digit. An empty string is a palindrome.",
+    "starterCode": "function isPalindrome(s) {\n  // your code here\n}",
     "tests": [
-      { "input": ["A man, a plan, a canal: Panama"], "expected": true },
-      { "input": ["race a car"], "expected": false },
-      { "input": [" "], "expected": true },
-      { "input": ["0P"], "expected": false },
-      { "input": ["a."], "expected": true }
+      { "input": "isPalindrome('racecar')", "expected": "true" },
+      { "input": "isPalindrome('A man, a plan, a canal: Panama')", "expected": "true" },
+      { "input": "isPalindrome('')", "expected": "true" },
+      { "input": "isPalindrome('hello')", "expected": "false" },
+      { "input": "isPalindrome('ab')", "expected": "false" }
     ],
-    "commonBug": "Not filtering non-alphanumeric characters or failing on empty strings"
+    "commonBug": "Does not handle spaces, punctuation or upper/lower case, or fails on the empty string.",
+    "commonErrorType": "edge_case_missed"
   },
   {
     "id": "tree_max_depth",
-    "title": "Maximum Depth of Binary Tree",
+    "title": "Maximum depth of a binary tree",
     "topic": "trees",
-    "difficulty": "easy",
-    "prompt": "Given a binary tree node object { val, left, right }, return its maximum depth. An empty tree has depth 0.",
-    "starterCode": "function maxDepth(root) {\n  // your code here\n}",
+    "difficulty": "medium",
     "language": "javascript",
+    "prompt": "Write maxDepth(root) for a binary tree. Each node is an object { val, left, right } where left and right are nodes or null. Return the number of nodes on the longest path from the root down to a leaf. An empty tree (null) has depth 0.",
+    "starterCode": "function maxDepth(root) {\n  // your code here\n}",
     "tests": [
-      { "input": [{ "val": 3, "left": { "val": 9 }, "right": { "val": 20, "left": { "val": 15 }, "right": { "val": 7 } } }], "expected": 3 },
-      { "input": [null], "expected": 0 },
-      { "input": [{ "val": 1, "left": null, "right": { "val": 2 } }], "expected": 2 },
-      { "input": [{ "val": 1 }], "expected": 1 },
-      { "input": [{ "val": 1, "left": { "val": 2, "left": { "val": 3 } }, "right": null }], "expected": 3 }
+      { "input": "maxDepth(null)", "expected": "0" },
+      { "input": "maxDepth({val:1,left:null,right:null})", "expected": "1" },
+      { "input": "maxDepth({val:1,left:{val:2,left:null,right:null},right:null})", "expected": "2" },
+      { "input": "maxDepth({val:1,left:{val:2,left:{val:4,left:null,right:null},right:null},right:{val:3,left:null,right:null}})", "expected": "3" },
+      { "input": "maxDepth({val:1,left:null,right:{val:2,left:null,right:{val:3,left:null,right:null}}})", "expected": "3" }
     ],
-    "commonBug": "Missing null check base case"
+    "commonBug": "Missing the null base case (crashes on null), or adds the two subtree depths instead of taking the maximum.",
+    "commonErrorType": "wrong_base_case"
   },
   {
     "id": "graph_dfs_reach",
-    "title": "DFS Reachability",
+    "title": "Can reach with DFS",
     "topic": "graphs",
     "difficulty": "medium",
-    "prompt": "Given an adjacency list graph and start and target nodes, return true if there is a path from start to target.",
-    "starterCode": "function canReach(adjList, start, target) {\n  // your code here\n}",
     "language": "javascript",
+    "prompt": "Write canReach(graph, start, target) using DFS. graph is an adjacency list object like {0:[1,2],1:[3],2:[],3:[]}. Return true if target can be reached from start by following edges. The graph may contain cycles.",
+    "starterCode": "function canReach(graph, start, target) {\n  // your code here\n}",
     "tests": [
-  { "input": [{ "0": [1, 2], "1": [2], "2": [0, 3], "3": [3] }, 2, 3], "expected": true },
-  { "input": [{ "0": [1], "1": [] }, 1, 0], "expected": false },
-  { "input": [{ "0": [] }, 0, 0], "expected": true },
-  { "input": [{ "0": [1], "1": [2], "2": [] }, 0, 2], "expected": true },
-  { "input": [{ "0": [1], "1": [0] }, 0, 2], "expected": false }
-],
-    "commonBug": "Infinite loop due to missing visited set in cyclic graph"
+      { "input": "canReach({0:[1,2],1:[3],2:[],3:[]}, 0, 3)", "expected": "true" },
+      { "input": "canReach({0:[1],1:[2],2:[0]}, 0, 2)", "expected": "true" },
+      { "input": "canReach({0:[1],1:[0],2:[]}, 0, 2)", "expected": "false" },
+      { "input": "canReach({0:[]}, 0, 0)", "expected": "true" },
+      { "input": "canReach({0:[1],1:[2],2:[1]}, 0, 5)", "expected": "false" }
+    ],
+    "commonBug": "No visited set, so DFS loops forever on a cycle.",
+    "commonErrorType": "logic_error"
   }
 ]

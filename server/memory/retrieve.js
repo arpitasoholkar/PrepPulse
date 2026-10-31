@@ -1,109 +1,123 @@
-import Memory from '../models/Memory.js';
+// server/memory/retrieve.js  (Owner: C)
+// Finds the 5 most useful memories for the current question.
+// Score = topic match + type bonus + confidence + recency + corrected bonus.
 
-const KEYWORD_MAP = {
-  'recursion': 'recursion',
-  'recursive': 'recursion',
-  'dfs': 'graphs',
-  'bfs': 'graphs',
-  'graph': 'graphs',
-  'tree': 'trees',
-  'binary tree': 'trees',
-  'array': 'arrays',
-  'binary search': 'arrays',
-  'string': 'strings',
-  'palindrome': 'strings',
-  'dp': 'dp',
-  'dynamic programming': 'dp',
-  'stack': 'stacks-queues',
-  'queue': 'stacks-queues',
-  'linked list': 'linked-list'
+import { Memory } from './deps.js';
+
+// Hardcoded prerequisite map: learning X needs Y first
+const PREREQS = {
+  graphs: ['recursion'],
+  trees: ['recursion'],
+  dp: ['recursion'],
 };
 
-const PREREQUISITES = {
-  'graphs': ['recursion'],
-  'trees': ['recursion'],
-  'dp': ['recursion']
-};
-
-export function detectTopic(message) {
-  const lower = message.toLowerCase();
-  for (const [kw, topic] of Object.entries(KEYWORD_MAP)) {
-    if (lower.includes(kw)) {
-      return topic;
-    }
-  }
-  return 'recursion'; // default fallback
+function getPrereqs(topic) {
+  return PREREQS[topic] || [];
 }
 
-export async function retrieveMemories({ userId, topic, limit = 5 }) {
-  const prereqs = PREREQUISITES[topic] || [];
-  const candidateTopics = [topic, '*', ...prereqs];
+// Order matters: specific topics first, general ones last
+const TOPIC_PATTERNS = [
+  ['graphs', /\b(dfs|bfs|graphs?|depth[- ]first|breadth[- ]first|dijkstra|adjacency|connected components?)\b/i],
+  ['trees', /\b(trees?|bst|binary tree|binary search tree|traversal|inorder|preorder|postorder|heap)\b/i],
+  ['dp', /\b(dp|dynamic programming|memoi[sz]ation|knapsack|tabulation)\b/i],
+  ['recursion', /\b(recursion|recursive|base case|backtracking|call stack)\b/i],
+  ['linked-list', /\b(linked lists?|singly|doubly|reverse a list)\b/i],
+  ['stacks-queues', /\b(stacks?|queues?|monotonic|deque)\b/i],
+  ['hashing', /\b(hash(ing|map|set|table)?|dictionary|frequency map)\b/i],
+  ['sorting', /\b(sort(ing)?|merge sort|quick sort|bubble sort)\b/i],
+  ['strings', /\b(strings?|palindrome|anagram|substring)\b/i],
+  ['arrays', /\b(arrays?|binary search|two pointers?|sliding window|prefix sum)\b/i],
+];
 
-  const activeMemories = await Memory.find({
-    userId,
-    status: 'active',
-    topic: { $in: candidateTopics }
-  });
+// Returns a topic string or null if nothing matched
+function detectTopic(message) {
+  const text = message || '';
+  for (const [topic, regex] of TOPIC_PATTERNS) {
+    if (regex.test(text)) return topic;
+  }
+  return null;
+}
 
-  const now = Date.now();
-  const scored = [];
+function daysAgo(date) {
+  if (!date) return Infinity;
+  return (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24);
+}
 
-  for (const mem of activeMemories) {
-    let score = 0;
-    const whyParts = [];
+function scoreMemory(mem, topic, prereqs) {
+  let score = 0;
+  const reasons = [];
 
-    // Topic match
-    if (mem.topic === topic) {
-      score += 3;
-      whyParts.push(`topic match: ${topic}`);
-    } else if (mem.topic === '*') {
-      score += 1;
-      whyParts.push('global preference');
-    } else if (prereqs.includes(mem.topic)) {
-      score += 2;
-      whyParts.push(`prerequisite match: ${mem.topic}`);
-    }
-
-    // Type weight
-    if (mem.type === 'learning_preference' || mem.type === 'mistake') {
-      score += 1;
-      whyParts.push(`${mem.type.replace('_', ' ')}`);
-    }
-
-    // Confidence
-    score += (mem.confidence || 0.5) * 2;
-
-    // Recency (last 14 days)
-    const ageDays = (now - new Date(mem.updatedAt || mem.createdAt).getTime()) / (1000 * 3600 * 24);
-    if (ageDays <= 14) {
-      const recencyBonus = Math.max(0, 1 - (ageDays / 14));
-      score += recencyBonus;
-    }
-
-    // Corrected memories get bonus
-    if (mem.status === 'corrected') {
-      score += 1;
-      whyParts.push('user corrected');
-    }
-
-    scored.push({
-      memory: mem,
-      why: whyParts.join('; '),
-      score: Number(score.toFixed(2))
-    });
+  if (topic && mem.topic === topic) {
+    score += 3;
+    reasons.push(`topic match: ${topic}`);
+  } else if (mem.topic === '*') {
+    score += 1;
+    reasons.push('applies to all topics');
+  } else if (prereqs.includes(mem.topic)) {
+    score += 2;
+    reasons.push(`prerequisite topic: ${mem.topic}`);
   }
 
-  scored.sort((a, b) => b.score - a.score);
-  const selected = scored.slice(0, limit);
+  if (mem.type === 'learning_preference') {
+    score += 1;
+    reasons.push('learning preference');
+  } else if (mem.type === 'mistake') {
+    score += 1;
+    reasons.push('past mistake');
+  }
 
-  // Update useCount and lastUsedAt
-  const selectedIds = selected.map(s => s.memory._id);
-  if (selectedIds.length > 0) {
+  score += (mem.confidence || 0) * 2;
+
+  const recentDays = daysAgo(mem.lastVerified || mem.updatedAt || mem.createdAt);
+  if (recentDays <= 14) {
+    score += 1 - recentDays / 14; // up to +1, fades over 14 days
+  }
+
+  if (mem.status === 'corrected') {
+    score += 1;
+    reasons.push('corrected by you');
+  }
+
+  return { score: Math.round(score * 100) / 100, reasons };
+}
+
+/**
+ * retrieveMemories({ userId, topic, limit })
+ * returns [{ memory, why, score }]  and updates useCount + lastUsedAt
+ */
+async function retrieveMemories({ userId, topic, limit = 5 }) {
+  const prereqs = getPrereqs(topic);
+
+  const all = await Memory.find({
+    userId,
+    status: { $in: ['active', 'corrected'] },
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+  }).lean();
+
+  const scored = all
+    .map((mem) => {
+      const { score, reasons } = scoreMemory(mem, topic, prereqs);
+      return { memory: mem, score, why: reasons.join('; ') || 'general memory' };
+    })
+    // keep only memories that relate to this topic, its prerequisites, or all topics
+    .filter(
+      (x) =>
+        !topic ||
+        x.memory.topic === topic ||
+        x.memory.topic === '*' ||
+        prereqs.includes(x.memory.topic)
+    )
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  if (scored.length > 0) {
     await Memory.updateMany(
-      { _id: { $in: selectedIds } },
+      { _id: { $in: scored.map((x) => x.memory._id) } },
       { $inc: { useCount: 1 }, $set: { lastUsedAt: new Date() } }
     );
   }
 
-  return selected;
+  return scored;
 }
+
+export { retrieveMemories, detectTopic, getPrereqs, PREREQS };

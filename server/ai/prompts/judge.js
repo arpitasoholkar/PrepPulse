@@ -1,23 +1,48 @@
-export function judgePrompt({ question, studentCode }) {
-  return `You are an automated DSA judge evaluating student code.
-Question Title: ${question.title}
-Topic: ${question.topic}
-Prompt: ${question.prompt}
-Test cases: ${JSON.stringify(question.tests)}
-Known common bug pattern: ${question.commonBug || 'None'}
+// server/ai/prompts/judge.js  (Owner: C)
+// Gemini acts as the code judge. We NEVER run student code on the server.
 
-Student Code:
-\`\`\`${question.language || 'javascript'}
-${studentCode}
+import { ERROR_TYPES } from '../../memory/deps.js';
+
+const JUDGE_SYSTEM = `You are a strict but fair code judge for a DSA practice platform.
+You do NOT run code. You carefully trace the student's code by hand against every test case.
+Rules:
+- Decide for each test case if the code returns the expected output.
+- "result" is "pass" only if ALL tests pass, "fail" if any test fails, "error" if the code has a syntax error or cannot run.
+- "errorType" must be exactly one of: ${ERROR_TYPES.join(', ')}. Use "none" when result is "pass".
+- "explanation" is 1 to 3 simple sentences saying what is wrong and why (no full solution).
+- "hint" is ONE short guiding question. Do not give the final code.
+- Use very simple English.`;
+
+const JUDGE_SCHEMA = `{
+  "result": "pass | fail | error",
+  "testsPassed": 0,
+  "testsTotal": 0,
+  "errorType": "one of the allowed error types",
+  "explanation": "string",
+  "hint": "string"
+}`;
+
+function buildJudgePrompt(question, code) {
+  const tests = question.tests
+    .map((t, i) => `${i + 1}. input: ${t.input}  ->  expected: ${t.expected}`)
+    .join('\n');
+  return `Question: ${question.title}
+${question.prompt}
+
+Language: ${question.language || 'javascript'}
+
+Test cases:
+${tests}
+
+A common bug students make on this question (use it as a hint when matching errorType, but only report it if the code really has it):
+${question.commonBug} (usual errorType: ${question.commonErrorType})
+
+Student code:
+\`\`\`
+${code}
 \`\`\`
 
-Evaluate the student's code against the test cases and algorithms standards.
-Do not execute arbitrary code; logically deduce correctness against each test case.
-Return JSON with the following fields:
-- result: "pass", "fail", or "error"
-- testsPassed: number of passing test cases
-- testsTotal: total number of test cases
-- errorType: one of ["off_by_one","wrong_base_case","wrong_loop_condition","logic_error","inefficient","edge_case_missed","syntax_error","none"]
-- explanation: clear explanation of why it failed or succeeded
-- hint: gentle guiding question or tip without giving full solution`;
+Total number of tests is ${question.tests.length}. Judge now.`;
 }
+
+export { JUDGE_SYSTEM, JUDGE_SCHEMA, buildJudgePrompt };
