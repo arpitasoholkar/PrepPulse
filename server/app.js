@@ -45,8 +45,13 @@ const routeFiles = fs.readdirSync(routesPath).filter(file => file.endsWith('.js'
 for (const file of routeFiles) {
   const routeModule = await import(`./routes/${file}`);
   const routeName = file.replace('.js', '');
-  // chat.js and practice.js define full paths (/chat, /practice/questions), so they mount at /api
-  const mountPath = ['chat', 'practice'].includes(routeName) ? '/api' : `/api/${routeName}`;
+  // Route mount mapping
+  let mountPath = `/api/${routeName}`;
+  if (routeName === 'practice') {
+    mountPath = '/api/practice';
+  } else if (routeName === 'chat') {
+    mountPath = '/api/chat';
+  }
   app.use(mountPath, routeModule.default);
   // Also register root health ping or specific mappings if needed
   if (routeName === 'health') {

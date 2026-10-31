@@ -107,17 +107,42 @@ async function retrieveMemories({ userId, topic, limit = 5 }) {
         x.memory.topic === '*' ||
         prereqs.includes(x.memory.topic)
     )
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
 
-  if (scored.length > 0) {
+  // Section 4 requirement: Always include the best worked and the best failed
+  // style memory for the topic if they exist, even when top limit would drop them.
+  let selected = scored.slice(0, limit);
+
+  if (topic) {
+    const isBestWorked = (item) =>
+      item.memory.type === 'learning_preference' &&
+      item.memory.topic === topic &&
+      item.memory.meta?.polarity === 'worked';
+
+    const isBestFailed = (item) =>
+      item.memory.type === 'learning_preference' &&
+      item.memory.topic === topic &&
+      item.memory.meta?.polarity === 'failed';
+
+    const bestWorked = scored.find(isBestWorked);
+    if (bestWorked && !selected.some((s) => String(s.memory._id) === String(bestWorked.memory._id))) {
+      selected.push(bestWorked);
+    }
+
+    const bestFailed = scored.find(isBestFailed);
+    if (bestFailed && !selected.some((s) => String(s.memory._id) === String(bestFailed.memory._id))) {
+      selected.push(bestFailed);
+    }
+  }
+
+  if (selected.length > 0) {
     await Memory.updateMany(
-      { _id: { $in: scored.map((x) => x.memory._id) } },
+      { _id: { $in: selected.map((x) => x.memory._id) } },
       { $inc: { useCount: 1 }, $set: { lastUsedAt: new Date() } }
     );
   }
 
-  return scored;
+  return selected;
 }
 
 export { retrieveMemories, detectTopic, getPrereqs, PREREQS };

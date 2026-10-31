@@ -3,6 +3,8 @@
 // Golden rule: a memory with status "corrected" is NEVER overwritten, we only add evidence.
 
 import { Memory, CodingAttempt } from './deps.js';
+import { shouldSave } from './gate.js';
+import { STYLE_HUMAN_NAMES } from './styles.js';
 
 const WEAKNESS_TEXT = {
   wrong_base_case: 'Forgets the base case',
@@ -290,6 +292,421 @@ async function createRevisionNeeded({ userId, topic, reason }) {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
   return { saved: [plain(created)], updated: [] };
+}
+
+/**
+ * Section 3.1 & Section 8:
+ * recordStyleOutcome({ userId, topic, style, outcome, evidenceText, refId, degraded, alreadyRecorded })
+ *
+ * Implements the full write rules for style memories:
+ * - outcome: "failed":
+ *     upsert failed(style, topic)
+ *     1st signal: confidence 0.4, tentative: true, expiresAt = now + 3 days
+ *     2nd signal: confidence 0.6, tentative: false, expiresAt = null
+ *     3rd+ signal: confidence 0.75
+ *     If an active worked(style, topic) exists: subtract 0.25, increment contradict count.
+ *     If confidence drops below 0.3, supersede it with failed(style, topic).
+ *
+ * - outcome: "worked":
+ *     upsert worked(style, topic)
+ *     1st signal: confidence 0.6
+ *     2nd signal: confidence 0.75
+ *     3rd+ signal: confidence 0.9 (cap)
+ *     Supersedes any active failed(style, topic) (supersededBy = new memory).
+ *
+ * - Global generalization:
+ *     Same style worked on 2 different topics -> create/raise global worked(style, "*") (0.85)
+ *     Same style failed on 2 different topics -> create/raise global failed(style, "*") (0.7)
+ *
+ * - Integrity:
+ *     Corrected memories are never overwritten (evidence appended only).
+ *     Every write passes through shouldSave.
+ *
+ * Returns { saved: [], updated: [], skipped: [] }
+ */
+export async function recordStyleOutcome({
+  userId,
+  topic,
+  style,
+  outcome, // 'worked' or 'failed'
+  evidenceText,
+  refId,
+  degraded = false,
+  alreadyRecorded = false,
+}) {
+  const saved = [];
+  const updated = [];
+  const skipped = [];
+
+  // Default topic if none provided
+  const targetTopic = topic || '*';
+
+  // Check gate
+  const gateCheck = shouldSave({
+    userId,
+    type: 'learning_preference',
+    topic: targetTopic,
+    style,
+    evidenceText,
+    refId,
+    degraded,
+    alreadyRecorded,
+  });
+
+  if (!gateCheck.ok) {
+    skipped.push({ text: evidenceText || `${outcome} on ${style}`, reason: gateCheck.reason });
+    return { saved, updated, skipped };
+  }
+
+  const evidence = evidenceEntry({ text: evidenceText, source: 'chat', refId });
+  const styleDisplay = STYLE_HUMAN_NAMES[style] || (style ? style.replace('_', ' ') : 'teaching');
+
+  if (outcome === 'failed') {
+    // 1. Check if an active worked memory exists for this style & topic
+    const activeWorked = await Memory.findOne({
+      userId,
+      type: 'learning_preference',
+      topic: targetTopic,
+      'meta.style': style,
+      'meta.polarity': 'worked',
+      status: { $in: ['active', 'corrected'] },
+    });
+
+    if (activeWorked) {
+      if (activeWorked.status === 'corrected') {
+        const up = await addEvidence(activeWorked, evidence);
+        updated.push(plain(up));
+      } else {
+        const newConf = Math.max(0, (activeWorked.confidence || 0.6) - 0.25);
+        const contradictCount = (activeWorked.meta?.contradict || 0) + 1;
+
+        if (newConf < 0.3) {
+          // Supersede with failed memory
+          const failedMem = await Memory.create({
+            userId,
+            type: 'learning_preference',
+            topic: targetTopic,
+            content: `${styleDisplay.charAt(0).toUpperCase() + styleDisplay.slice(1)} explanations did not work for ${targetTopic}`,
+            evidence: [evidence],
+            confidence: 0.4,
+            status: 'active',
+            meta: {
+              style,
+              polarity: 'failed',
+              tentative: true,
+              support: 1,
+              contradict: 0,
+            },
+            source: 'chat',
+            lastVerified: new Date(),
+            expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          });
+          saved.push(plain(failedMem));
+
+          const superseded = await Memory.findByIdAndUpdate(
+            activeWorked._id,
+            {
+              $set: {
+                status: 'superseded',
+                supersededBy: failedMem._id,
+                confidence: newConf,
+                'meta.contradict': contradictCount,
+                lastVerified: new Date(),
+              },
+              $push: { evidence },
+            },
+            { new: true }
+          );
+          updated.push(plain(superseded));
+        } else {
+          // Lower confidence and add contradict count
+          const lowered = await Memory.findByIdAndUpdate(
+            activeWorked._id,
+            {
+              $set: {
+                confidence: newConf,
+                'meta.contradict': contradictCount,
+                lastVerified: new Date(),
+              },
+              $push: { evidence },
+            },
+            { new: true }
+          );
+          updated.push(plain(lowered));
+        }
+      }
+    } else {
+      // Upsert failed(style, topic)
+      let failedMem = await Memory.findOne({
+        userId,
+        type: 'learning_preference',
+        topic: targetTopic,
+        'meta.style': style,
+        'meta.polarity': 'failed',
+        status: { $in: ['active', 'corrected'] },
+      });
+
+      if (failedMem) {
+        if (failedMem.status === 'corrected') {
+          failedMem = await addEvidence(failedMem, evidence);
+          updated.push(plain(failedMem));
+        } else {
+          const currentSupport = (failedMem.meta?.support || 1) + 1;
+          const nextConf = currentSupport === 2 ? 0.6 : 0.75;
+          const setFields = {
+            confidence: nextConf,
+            'meta.support': currentSupport,
+            'meta.tentative': false,
+            expiresAt: null, // Cleared on 2nd signal
+            lastVerified: new Date(),
+          };
+          failedMem = await Memory.findByIdAndUpdate(
+            failedMem._id,
+            { $set: setFields, $push: { evidence } },
+            { new: true }
+          );
+          updated.push(plain(failedMem));
+        }
+      } else {
+        failedMem = await Memory.create({
+          userId,
+          type: 'learning_preference',
+          topic: targetTopic,
+          content: `${styleDisplay.charAt(0).toUpperCase() + styleDisplay.slice(1)} explanations did not work for ${targetTopic}`,
+          evidence: [evidence],
+          confidence: 0.4,
+          status: 'active',
+          meta: {
+            style,
+            polarity: 'failed',
+            tentative: true,
+            support: 1,
+            contradict: 0,
+          },
+          source: 'chat',
+          lastVerified: new Date(),
+          expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days TTL
+        });
+        saved.push(plain(failedMem));
+      }
+    }
+
+    // Global failed rule: same style failed on 2 different topics -> create global failed(style, "*")
+    if (targetTopic !== '*') {
+      const otherFailed = await Memory.find({
+        userId,
+        type: 'learning_preference',
+        'meta.style': style,
+        'meta.polarity': 'failed',
+        topic: { $nin: [targetTopic, '*'] },
+        status: { $in: ['active', 'corrected'] },
+      });
+
+      if (otherFailed.length > 0) {
+        let globalFailed = await Memory.findOne({
+          userId,
+          type: 'learning_preference',
+          topic: '*',
+          'meta.style': style,
+          'meta.polarity': 'failed',
+          status: { $in: ['active', 'corrected'] },
+        });
+
+        if (globalFailed) {
+          if (globalFailed.status !== 'corrected') {
+            globalFailed = await Memory.findByIdAndUpdate(
+              globalFailed._id,
+              {
+                $set: { confidence: 0.7, lastVerified: new Date() },
+                $push: { evidence },
+              },
+              { new: true }
+            );
+          }
+          updated.push(plain(globalFailed));
+        } else {
+          globalFailed = await Memory.create({
+            userId,
+            type: 'learning_preference',
+            topic: '*',
+            content: `${styleDisplay.charAt(0).toUpperCase() + styleDisplay.slice(1)} explanations generally did not work across topics`,
+            evidence: [
+              evidence,
+              evidenceEntry({
+                text: `Failed on ${targetTopic} and ${otherFailed[0].topic}`,
+                source: 'chat',
+                refId,
+              }),
+            ],
+            confidence: 0.7,
+            status: 'active',
+            meta: {
+              style,
+              polarity: 'failed',
+              tentative: false,
+              support: 2,
+              contradict: 0,
+            },
+            source: 'chat',
+            lastVerified: new Date(),
+          });
+          saved.push(plain(globalFailed));
+        }
+      }
+    }
+  } else if (outcome === 'worked') {
+    // 1. Upsert worked(style, topic)
+    let workedMem = await Memory.findOne({
+      userId,
+      type: 'learning_preference',
+      topic: targetTopic,
+      'meta.style': style,
+      'meta.polarity': 'worked',
+      status: { $in: ['active', 'corrected'] },
+    });
+
+    let newWorkedCreated = null;
+
+    if (workedMem) {
+      if (workedMem.status === 'corrected') {
+        workedMem = await addEvidence(workedMem, evidence);
+        updated.push(plain(workedMem));
+      } else {
+        const currentSupport = (workedMem.meta?.support || 1) + 1;
+        const nextConf = currentSupport === 2 ? 0.75 : 0.9; // Cap at 0.9
+        workedMem = await Memory.findByIdAndUpdate(
+          workedMem._id,
+          {
+            $set: {
+              confidence: nextConf,
+              'meta.support': currentSupport,
+              'meta.tentative': false,
+              expiresAt: null,
+              lastVerified: new Date(),
+            },
+            $push: { evidence },
+          },
+          { new: true }
+        );
+        updated.push(plain(workedMem));
+      }
+    } else {
+      workedMem = await Memory.create({
+        userId,
+        type: 'learning_preference',
+        topic: targetTopic,
+        content: `Understands ${targetTopic} best with a ${styleDisplay} explanation`,
+        evidence: [evidence],
+        confidence: 0.6,
+        status: 'active',
+        meta: {
+          style,
+          polarity: 'worked',
+          tentative: false,
+          support: 1,
+          contradict: 0,
+        },
+        source: 'chat',
+        lastVerified: new Date(),
+        expiresAt: null,
+      });
+      newWorkedCreated = workedMem;
+      saved.push(plain(workedMem));
+    }
+
+    // 2. If an active failed(style, topic) exists, supersede it
+    const activeFailed = await Memory.findOne({
+      userId,
+      type: 'learning_preference',
+      topic: targetTopic,
+      'meta.style': style,
+      'meta.polarity': 'failed',
+      status: 'active',
+    });
+
+    if (activeFailed) {
+      const replacingId = (newWorkedCreated || workedMem)._id;
+      const supersededFailed = await Memory.findByIdAndUpdate(
+        activeFailed._id,
+        {
+          $set: {
+            status: 'superseded',
+            supersededBy: replacingId,
+            lastVerified: new Date(),
+          },
+          $push: { evidence },
+        },
+        { new: true }
+      );
+      updated.push(plain(supersededFailed));
+    }
+
+    // 3. Global worked rule: same style worked on 2 different topics -> create/raise global worked(style, "*")
+    if (targetTopic !== '*') {
+      const otherWorked = await Memory.find({
+        userId,
+        type: 'learning_preference',
+        'meta.style': style,
+        'meta.polarity': 'worked',
+        topic: { $nin: [targetTopic, '*'] },
+        status: { $in: ['active', 'corrected'] },
+      });
+
+      if (otherWorked.length > 0) {
+        let globalWorked = await Memory.findOne({
+          userId,
+          type: 'learning_preference',
+          topic: '*',
+          'meta.style': style,
+          'meta.polarity': 'worked',
+          status: { $in: ['active', 'corrected'] },
+        });
+
+        if (globalWorked) {
+          if (globalWorked.status !== 'corrected') {
+            globalWorked = await Memory.findByIdAndUpdate(
+              globalWorked._id,
+              {
+                $set: { confidence: 0.85, lastVerified: new Date() },
+                $push: { evidence },
+              },
+              { new: true }
+            );
+          }
+          updated.push(plain(globalWorked));
+        } else {
+          globalWorked = await Memory.create({
+            userId,
+            type: 'learning_preference',
+            topic: '*',
+            content: `Understands most topics best with a ${styleDisplay} explanation`,
+            evidence: [
+              evidence,
+              evidenceEntry({
+                text: `Worked on ${targetTopic} and ${otherWorked[0].topic}`,
+                source: 'chat',
+                refId,
+              }),
+            ],
+            confidence: 0.85,
+            status: 'active',
+            meta: {
+              style,
+              polarity: 'worked',
+              tentative: false,
+              support: 2,
+              contradict: 0,
+            },
+            source: 'chat',
+            lastVerified: new Date(),
+          });
+          saved.push(plain(globalWorked));
+        }
+      }
+    }
+  }
+
+  return { saved, updated, skipped };
 }
 
 export {

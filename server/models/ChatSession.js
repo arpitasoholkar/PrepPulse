@@ -9,6 +9,8 @@ const messageSchema = new mongoose.Schema({
   style: { type: String, default: null },
   explanationStyle: { type: String, enum: EXPLANATION_STYLES, default: null },
   memoriesUsed: [{ type: Object }],
+  degraded: { type: Boolean, default: false },
+  feedback: { type: String, enum: ['understood', 'not_understood', null], default: null },
   timestamp: { type: Date, default: Date.now }
 }, { _id: false });
 
@@ -19,7 +21,13 @@ const chatSessionSchema = new mongoose.Schema({
   ladder: {
     topic: { type: String, default: null },
     step: { type: Number, default: 0 },
-    stylesTried: [{ type: String }]
+    stylesTried: [{ type: String }],
+    tried: [{
+      style: { type: String },
+      outcome: { type: String, enum: ['pending', 'failed', 'worked'], default: 'pending' },
+      _id: false
+    }],
+    exhausted: { type: Boolean, default: false }
   }
 }, { timestamps: true });
 

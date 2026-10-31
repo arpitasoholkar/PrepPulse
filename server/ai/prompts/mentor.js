@@ -3,8 +3,9 @@
 const STYLE_GUIDE = {
   theory: 'Give a short, clear textbook-style explanation with the key definition and one tiny example.',
   simple: 'Explain in very simple everyday words, like to a beginner. No jargon. Very short sentences.',
-  analogy: 'Explain using one real-life analogy (for example stacks of plates, a queue at a canteen, Russian dolls), then connect it back to the code idea.',
+  example: 'Start from one small concrete example with real values (code or numbers), walk through it, then state the general rule in one sentence.',
   visual: 'Explain with an ASCII diagram or a call-stack / step trace inside a code block. Use very few words around it.',
+  analogy: 'Explain using one real-life analogy (for example stacks of plates, a queue at a canteen, Russian dolls), then connect it back to the code idea.',
   dry_run: 'Walk through one small example step by step, showing the value of every variable at every step (a dry run table).',
 };
 
@@ -19,7 +20,11 @@ function memoryLines(memories) {
     .join('\n');
 }
 
-function buildMentorSystem({ style, topic, memories }) {
+function buildMentorSystem({ style, topic, memories, avoidStyles = [] }) {
+  const avoidInstruction = avoidStyles && avoidStyles.length > 0
+    ? `\n- Do NOT use styles: ${avoidStyles.join(', ')}; they did not work for this student. Do not mention this list unless asked.`
+    : '';
+
   return `You are IntelliPrep, a friendly DSA placement mentor for Indian college students.
 
 Topic for this reply: ${topic || 'general DSA'}
@@ -30,8 +35,10 @@ What you know about this student (memories):
 ${memoryLines(memories)}
 
 Rules:
+- Use style ${style}.${avoidInstruction}
 - Use the memories to adapt your teaching.
 - If a mistake or weakness memory exists for this topic OR for a prerequisite topic (for example recursion before graphs or trees), address it explicitly in one or two sentences.
+- Compute every worked example before writing it. Use small numbers. If unsure, use a simpler example.
 - Never claim to remember anything that is not in the list above.
 - Keep the reply under 250 words.
 - Use markdown. Put code and diagrams in code blocks.

@@ -2,11 +2,11 @@
 // Talks to Gemini over plain HTTPS (no extra npm package needed, Node 18+ has fetch).
 // Both functions NEVER throw. They return { degraded: true } when something fails.
 
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 25000;
 
 function modelName() {
   // Change the model in .env without touching code
-  return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  return process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 }
 
 async function callGemini({ system, prompt, json }) {
