@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { CheckCircle2, ArrowRight, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, ArrowRight, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import FeedbackButtons from './FeedbackButtons.jsx';
 import LadderRow from './LadderRow.jsx';
 import { getStyleBadge } from '../../components/memoryStyles.js';
@@ -30,6 +30,14 @@ const markdownComponents = {
     </code>
   ),
 };
+
+const VERDICT_CHIP = {
+  correct: { label: 'Your answer: correct', cls: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' },
+  partial: { label: 'Your answer: partly right', cls: 'border-amber-400/30 bg-amber-400/10 text-amber-300' },
+  wrong: { label: 'Your answer: not quite', cls: 'border-rose-400/30 bg-rose-400/10 text-rose-300' },
+};
+
+const LEVEL_LABEL = { basic: 'Basic', intermediate: 'Intermediate', advanced: 'Advanced' };
 
 export default function MessageBubble({
   message,
@@ -80,6 +88,23 @@ export default function MessageBubble({
             <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-300">
               <AlertTriangle className="w-3 h-3" />
               Fallback reply
+            </span>
+          )}
+          {message.judgement && VERDICT_CHIP[message.judgement.verdict] && (
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${VERDICT_CHIP[message.judgement.verdict].cls}`}
+            >
+              {VERDICT_CHIP[message.judgement.verdict].label}
+            </span>
+          )}
+          {message.understanding && LEVEL_LABEL[message.understanding.level] && (
+            <span
+              title="The mentor adjusts difficulty to your answers"
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-violet-400/30 bg-violet-400/10 text-violet-200"
+            >
+              {message.levelChange > 0 && <TrendingUp className="w-3 h-3" />}
+              {message.levelChange < 0 && <TrendingDown className="w-3 h-3" />}
+              Level: {LEVEL_LABEL[message.understanding.level]}
             </span>
           )}
           <span className="ml-auto text-xs text-slate-500">

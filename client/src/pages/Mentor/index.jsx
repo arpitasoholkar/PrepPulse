@@ -37,6 +37,10 @@ const toAiMessage = (data, feedback = null) => ({
   exhausted: Boolean(data.ladder?.exhausted),
   stylePlan: data.stylePlan || [],
   memoriesUsed: data.memoriesUsed || [],
+  understanding: data.understanding || null,
+  judgement: data.judgement || null,
+  levelChange: data.levelChange || 0,
+  awaitingAnswer: Boolean(data.awaitingAnswer),
   feedback,
 });
 
@@ -320,7 +324,11 @@ export default function Mentor() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={loading}
-                placeholder="Ask the mentor, for example: Explain recursion"
+                placeholder={
+                  lastAi?.awaitingAnswer
+                    ? 'Type your answer to the question above, or ask something else'
+                    : 'Ask the mentor, for example: Explain recursion'
+                }
                 className="flex-1 resize-none rounded-full border border-[#ececf2] bg-white px-6 py-3 text-base text-ink shadow-sm placeholder:text-ink-soft focus:outline-none focus:border-[#7652C8] focus:ring-2 focus:ring-[#7652C8]/30 disabled:opacity-60"
               />
               <button

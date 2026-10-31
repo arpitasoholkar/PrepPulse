@@ -18,6 +18,11 @@ const chatSessionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   sessionId: { type: String, required: true },
   messages: [messageSchema],
+  // Per-topic understanding profile: { [topic]: { level, streakRight, weakConcepts, ... } }
+  understanding: { type: mongoose.Schema.Types.Mixed, default: {} },
+  // The check question the mentor asked last and is waiting for an answer to:
+  // { question, answer, concept, topic, messageId, askedAt }  (or null)
+  pending: { type: mongoose.Schema.Types.Mixed, default: null },
   ladder: {
     topic: { type: String, default: null },
     step: { type: Number, default: 0 },

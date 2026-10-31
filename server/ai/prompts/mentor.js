@@ -1,7 +1,7 @@
 // server/ai/prompts/mentor.js  (Owner: C)
 
 const STYLE_GUIDE = {
-  theory: 'Give a short, clear textbook-style explanation with the key definition and one tiny example.',
+  theory: 'Give a clear textbook-style explanation: the key definition, how it works, the important properties or complexity, and one fully worked example.',
   simple: 'Explain in very simple everyday words, like to a beginner. No jargon. Very short sentences.',
   example: 'Start from one small concrete example with real values (code or numbers), walk through it, then state the general rule in one sentence.',
   visual: 'Explain with an ASCII diagram or a call-stack / step trace inside a code block. Use very few words around it.',
@@ -20,7 +20,7 @@ function memoryLines(memories) {
     .join('\n');
 }
 
-function buildMentorSystem({ style, topic, memories, avoidStyles = [] }) {
+function buildMentorSystem({ style, topic, memories, avoidStyles = [], adaptation = '' }) {
   const avoidInstruction = avoidStyles && avoidStyles.length > 0
     ? `\n- Do NOT use styles: ${avoidStyles.join(', ')}; they did not work for this student. Do not mention this list unless asked.`
     : '';
@@ -31,28 +31,33 @@ Topic for this reply: ${topic || 'general DSA'}
 Explanation style to use: ${style}
 Style instruction: ${STYLE_GUIDE[style] || STYLE_GUIDE.theory}
 
+How well this student is understanding right now (follow this closely, it decides how hard your reply is):
+${adaptation || 'No information yet: start at a basic level.'}
+
 What you know about this student (memories):
 ${memoryLines(memories)}
 
-Rules:
-- Use style ${style}.${avoidInstruction}
-- Use the memories to adapt your teaching.
-- If a mistake or weakness memory exists for this topic OR for a prerequisite topic (for example recursion before graphs or trees), address it explicitly in one or two sentences.
-- Compute every worked example before writing it. Use small numbers. If unsure, use a simpler example.
-- Never claim to remember anything that is not in the list above.
-- Answer what the student just said. Use the conversation so far. If they are answering your last question, say clearly whether it is right or wrong and why, then continue teaching from there. If they say "continue", "next" or "what next", move to the next step.
-- For a big topic (for example DFS, BFS, dynamic programming), start with a one-line roadmap of the steps, for example "Plan: 1) idea, 2) recursive code, 3) stack version, 4) cost". Teach step 1 completely, then finish with "Next we will cover: step 2" so the student knows what is coming.
-- Never stop in the middle of an explanation. Keep the reply under 350 words by teaching one step well instead of cutting a step short.
-- Use markdown. Put code and diagrams in code blocks.
-- Visual style means an ASCII diagram or call-stack trace.
-- End with one short question or tiny exercise to check understanding.`;
+How to answer:
+1. Answer EXACTLY what the student asked, in a detailed but crisp, on-point way. About 250 to 400 words (code blocks do not count). No long introductions, no filler.
+2. Cover what matters for that question: the core idea, how it works step by step, one fully worked example with small real values, complexity or key properties, and one common pitfall. Choose what fits the student's level.
+3. For a big topic (for example DFS, BFS, dynamic programming, trees) give a brief but complete overview of the important parts (idea, how it works, key properties and complexity, when to use it, typical interview problems), kept compact. Do not write a syllabus. End the teaching part with ONE line suggesting what they could go deeper into next.
+4. If the message is not a topic request (a specific doubt, an output to predict, a bug, a comparison), answer that directly.
+5. Use style ${style}.${avoidInstruction}
+6. Use the memories to adapt. If a mistake or weakness memory exists for this topic or a prerequisite topic (for example recursion before graphs or trees), address it in one or two sentences.
+7. Compute every worked example before writing it. Use small numbers. If unsure, use a simpler example.
+8. Never claim to remember anything that is not in the lists above.
+9. Use the conversation so far. If they say "continue", "next" or "what next", move to the next piece.
+10. Use markdown. Put code and diagrams in code blocks. Visual style means an ASCII diagram or call-stack trace.
+11. End the visible reply with exactly ONE check question at the level described above, for example "what is the output of this?", "in what order are the nodes visited?", "what is the time complexity and why?". It must be answerable in a short reply. Never put the answer in the reply.
+12. After that question, on a new last line, add this hidden block (the app removes it, never mention it):
+[[CHECK]]{"question":"the same question","answer":"the correct short answer, computed carefully","concept":"1 to 3 lowercase words naming the concept being tested"}[[/CHECK]]`;
 }
 
 function historyText(history) {
   if (!Array.isArray(history) || history.length === 0) return '';
   return history
-    .slice(-6)
-    .map((m) => `${m.role === 'assistant' ? 'Mentor' : 'Student'}: ${String(m.content || '').slice(0, 700)}`)
+    .slice(-12)
+    .map((m) => `${m.role === 'assistant' ? 'Mentor' : 'Student'}: ${String(m.content || '').slice(0, 900)}`)
     .join('\n');
 }
 
@@ -75,10 +80,37 @@ Explain it again in the new style. Do not repeat the same wording.`;
 Reply to this message in the context of the conversation above.`;
 }
 
+// Grades the student's reply to the last check question.
+function buildJudgeSystem() {
+  return `You grade a student's short reply to a DSA check question. Be fair: accept equivalent wording, ignore typos and spelling.
+- isAnswer = false only if the student is NOT trying to answer (they ask a new question, change topic, or chat).
+- "I don't know" or a blank guess counts as an attempt: isAnswer true, verdict "wrong".
+- verdict: "correct" (fully right), "partial" (some right, something missing or wrong), "wrong".
+- whatRight / whatMissing: one short phrase each, or "".
+- misconception: the likely wrong idea behind a wrong answer, or "".
+- concept: 1 to 3 lowercase words naming the concept tested.`;
+}
+
+function buildJudgePrompt({ question, expected, studentReply }) {
+  return `Check question: ${question}
+Correct answer: ${expected}
+Student reply: ${String(studentReply).slice(0, 800)}`;
+}
+
+const JUDGE_SCHEMA = '{ "isAnswer": true, "verdict": "correct | partial | wrong", "whatRight": "", "whatMissing": "", "misconception": "", "concept": "" }';
+
 // Used when Gemini is down so the demo never shows a blank screen
 function fallbackReply(topic, style) {
   const t = topic || 'this topic';
   return `I'm having trouble reaching my AI engine right now, so here is a quick note on **${t}** (${style} style).\n\nTry breaking the problem into the smallest possible case first, then build up from there. Please click "New session" or retry in a few seconds for a full answer.`;
 }
 
-export { buildMentorSystem, buildMentorPrompt, fallbackReply, STYLE_GUIDE };
+export {
+  buildMentorSystem,
+  buildMentorPrompt,
+  buildJudgeSystem,
+  buildJudgePrompt,
+  JUDGE_SCHEMA,
+  fallbackReply,
+  STYLE_GUIDE,
+};

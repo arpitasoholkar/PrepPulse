@@ -11,6 +11,9 @@ import { generateText, generateJSON } from '../ai/gemini.js';
 import {
   buildMentorSystem,
   buildMentorPrompt,
+  buildJudgeSystem,
+  buildJudgePrompt,
+  JUDGE_SCHEMA,
   fallbackReply,
 } from '../ai/prompts/mentor.js';
 import { retrieveMemories, detectTopic } from '../memory/retrieve.js';
@@ -20,6 +23,20 @@ import { recordStyleOutcome, saveConceptUnderstood } from '../memory/lifecycle.j
 import { shouldSave, isSmallTalk } from '../memory/gate.js';
 import { extractFactsFromChat } from '../memory/extract.js';
 import { recordEvent } from '../gamification/service.js';
+import {
+  normaliseUnderstanding,
+  initialLevel,
+  applyVerdict,
+  applyNotUnderstood,
+  rememberQuestion,
+  buildAdaptation,
+  splitCheck,
+  heuristicVerdict,
+  VERDICTS,
+} from '../memory/understanding.js';
+import { recordQuizOutcome } from '../memory/quiz.js';
+
+const HISTORY_SIZE = 12;
 
 // Try loading Person A's intent detector if present, otherwise fallback
 let detectFeedbackIntent = null;
@@ -96,13 +113,14 @@ async function resolveTopic(message, session) {
   return (session.ladder && session.ladder.topic) || null;
 }
 
-async function makeReply({ style, topic, used, question, previousReply, avoidStyles = [], history = [] }) {
+async function makeReply({ style, topic, used, question, previousReply, avoidStyles = [], history = [], adaptation = '' }) {
   const { text, degraded } = await generateText({
     system: buildMentorSystem({
       style,
       topic,
       memories: used,
       avoidStyles,
+      adaptation,
     }),
     prompt: buildMentorPrompt({
       question,
@@ -114,13 +132,93 @@ async function makeReply({ style, topic, used, question, previousReply, avoidSty
   if (degraded || !text) {
     return {
       reply: fallbackReply(topic, style),
+      check: null,
       degraded: true,
     };
   }
 
+  // The model ends with a hidden [[CHECK]] block: strip it, keep the question + expected answer.
+  const { reply, check } = splitCheck(text);
+
   return {
-    reply: text,
+    reply: reply || text,
+    check,
     degraded: false,
+  };
+}
+
+// Per-topic understanding profile for this session (starts from what memory already knows).
+const topicKey = (topic) => topic || 'general';
+
+function getUnderstanding(session, topic, used = []) {
+  const raw = session.understanding && session.understanding[topicKey(topic)];
+  return normaliseUnderstanding(raw, initialLevel(used));
+}
+
+function saveUnderstanding(session, topic, state) {
+  session.set('understanding', { ...(session.understanding || {}), [topicKey(topic)]: state });
+}
+
+const understandingForResponse = (u) =>
+  u && {
+    level: u.level,
+    streakRight: u.streakRight,
+    streakWrong: u.streakWrong,
+    answered: u.answered,
+    correct: u.correct,
+    lastVerdict: u.lastVerdict,
+    weakConcepts: u.weakConcepts,
+    strongConcepts: u.strongConcepts,
+  };
+
+const setPending = (session, check, topic, messageId) =>
+  session.set(
+    'pending',
+    check ? { question: check.question, answer: check.answer, concept: check.concept, topic, messageId, askedAt: new Date() } : null
+  );
+
+// A short reply while a check question is open is usually the answer ("B", "5", "1 2 4 3").
+const looksLikeAnswer = (message) => /\d|[\[\]{}()=<>]/.test(message);
+
+// "Explain BFS", "what is a heap?" are obviously new questions: no need to grade them as answers.
+const isClearlyNewQuestion = (message) =>
+  message.trim().split(/\s+/).length >= 3 &&
+  !looksLikeAnswer(message) &&
+  /^(explain|teach|what is|what are|whats|what's|how (does|do|to)|tell me|show me|compare|difference|can you|could you)\b/i.test(message.trim());
+
+/**
+ * Grades the student's message against the open check question.
+ * Returns { isAnswer, verdict, whatRight, whatMissing, misconception, concept, degraded }.
+ */
+async function judgeAnswer(pending, message) {
+  const { data, degraded } = await generateJSON({
+    system: buildJudgeSystem(),
+    prompt: buildJudgePrompt({ question: pending.question, expected: pending.answer, studentReply: message }),
+    schema: JUDGE_SCHEMA,
+  });
+
+  if (!degraded && data && VERDICTS.includes(data.verdict)) {
+    return {
+      isAnswer: data.isAnswer !== false,
+      verdict: data.verdict,
+      whatRight: String(data.whatRight || ''),
+      whatMissing: String(data.whatMissing || ''),
+      misconception: String(data.misconception || ''),
+      concept: String(data.concept || pending.concept || '').trim().toLowerCase() || null,
+      degraded: false,
+    };
+  }
+
+  // AI down: fall back to a simple text comparison so the lesson can still continue.
+  const verdict = heuristicVerdict(message, pending.answer);
+  return {
+    isAnswer: Boolean(verdict),
+    verdict,
+    whatRight: '',
+    whatMissing: '',
+    misconception: '',
+    concept: pending.concept || null,
+    degraded: true,
   };
 }
 
@@ -281,6 +379,10 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       alreadyRecorded: false,
     });
 
+    // The student is struggling: drop the level so the next explanation is simpler.
+    const stepDown = applyNotUnderstood(getUnderstanding(session, targetTopic));
+    saveUnderstanding(session, targetTopic, stepDown.state);
+
     // Advance ladder to next best style
     const { ladder, style: nextStyle, reason, stylePlan, exhausted } = await nextStep({
       userId,
@@ -293,6 +395,7 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       ladder.exhausted = true;
       const exhaustedReply = `We've tried several explanation styles for **${targetTopic}**. Which exact part or line is confusing? You can also try a practice problem to test your understanding hands-on!`;
       const newId = newMessageId();
+      session.set('pending', null);
 
       session.messages.push({
         id: newId,
@@ -334,17 +437,19 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
 
     const avoidStyles = stylePlan.filter((s) => s.status === 'avoid').map((s) => s.style);
 
-    const { reply, degraded } = await makeReply({
+    const { reply, check, degraded } = await makeReply({
       style: nextStyle,
       topic: targetTopic,
       used,
       question,
       previousReply: aiMessage.content,
       avoidStyles,
-      history: session.messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+      history: session.messages.slice(-HISTORY_SIZE).map((m) => ({ role: m.role, content: m.content })),
+      adaptation: buildAdaptation({ state: stepDown.state, levelChange: stepDown.levelChange }),
     });
 
     const newId = newMessageId();
+    setPending(session, check, targetTopic, newId);
 
     session.messages.push({
       id: newId,
@@ -372,6 +477,8 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       memoriesSkipped: styleOutcome.skipped,
       alreadyRecorded: false,
       feedbackApplied: 'not_understood',
+      understanding: understandingForResponse(stepDown.state),
+      levelChange: stepDown.levelChange,
       done: false,
       degraded,
     };
@@ -390,10 +497,14 @@ router.post('/', async (req, res, next) => {
 
     const session = await getOrCreateSession(req.userId, sessionId);
 
-    // 1. Check for typed feedback intent on the previous AI reply
+    // 1. Check for typed feedback intent on the previous AI reply.
+    // While a check question is open, an answer like "it is 5" must not be mistaken for "I understand".
     const lastAssistantMessage = [...session.messages].reverse().find((m) => m.role === 'assistant');
     const hasPreviousAnswer = Boolean(lastAssistantMessage);
-    const feedbackIntent = detectFeedbackIntent ? detectFeedbackIntent(message, hasPreviousAnswer) : null;
+    let feedbackIntent = detectFeedbackIntent ? detectFeedbackIntent(message, hasPreviousAnswer) : null;
+    if (feedbackIntent === 'understood' && session.pending && looksLikeAnswer(message)) {
+      feedbackIntent = null;
+    }
 
     if (feedbackIntent && lastAssistantMessage) {
       // Record the user's typed feedback message in session
@@ -428,20 +539,17 @@ router.post('/', async (req, res, next) => {
       memoriesSkipped.push({ text: message, reason: 'small talk' });
     }
 
-    // 3. Normal question flow
-    const topic = await resolveTopic(message, session);
-
-    // Check if continuing previous topic ladder or starting fresh
-    let existingTried = [];
-    if (session.ladder && session.ladder.topic === topic && session.ladder.tried && session.ladder.tried.length > 0) {
-      existingTried = session.ladder.tried;
+    // 3. Is this the student's answer to the check question the mentor asked last?
+    let judged = null;
+    const pending = session.pending && session.pending.question ? session.pending : null;
+    if (pending && !isSmallTalkMessage && !isClearlyNewQuestion(message)) {
+      judged = await judgeAnswer(pending, message);
+      if (!judged.isAnswer || !judged.verdict) judged = null; // a new question, not an answer
     }
+    const isAnswer = Boolean(judged);
 
-    const { ladder, style, reason, stylePlan, exhausted } = await startLadder({
-      userId: req.userId,
-      topic,
-      existingTried,
-    });
+    // An answer ("B", "5") carries no topic of its own, so it stays on the question's topic.
+    const topic = isAnswer && pending.topic ? pending.topic : await resolveTopic(message, session);
 
     const used = await retrieveMemories({
       userId: req.userId,
@@ -449,18 +557,79 @@ router.post('/', async (req, res, next) => {
       limit: 5,
     });
 
+    // 4. Update what we know about how well the student understands this topic.
+    let state = getUnderstanding(session, topic, used);
+    let levelChange = 0;
+    let quizMemories = { saved: [], updated: [], skipped: [] };
+
+    if (isAnswer) {
+      const out = applyVerdict(state, judged.verdict, { concept: judged.concept });
+      state = out.state;
+      levelChange = out.levelChange;
+
+      if (!judged.degraded) {
+        try {
+          quizMemories = await recordQuizOutcome({
+            userId: req.userId,
+            topic,
+            verdict: judged.verdict,
+            concept: judged.concept,
+            question: pending.question,
+            refId: pending.messageId,
+          });
+        } catch (err) {
+          // memory is best effort, never block the lesson
+        }
+      }
+    } else {
+      state = rememberQuestion(state, message);
+    }
+    saveUnderstanding(session, topic, state);
+
+    // 5. Pick the explanation style.
+    let ladder;
+    let style;
+    let reason;
+    let stylePlan;
+
+    if (isAnswer) {
+      // Keep teaching with the same style; after a wrong answer switch to a plain worked example.
+      const current = JSON.parse(JSON.stringify(session.ladder || { tried: [] }));
+      const triedStyles = (current.tried || []).map((t) => t.style);
+      const lastStyle = triedStyles[triedStyles.length - 1] || 'theory';
+      style = judged.verdict === 'wrong' ? (lastStyle === 'example' ? 'simple' : 'example') : lastStyle;
+      const ranking = await rankStyles({ userId: req.userId, topic, tried: triedStyles });
+      ladder = { ...current, topic };
+      stylePlan = ranking.stylePlan;
+      reason = `Your answer was ${judged.verdict}, so I'm ${
+        judged.verdict === 'wrong' ? 'going simpler' : judged.verdict === 'correct' ? 'going a step deeper' : 'filling the gap'
+      } (${state.level} level)`;
+    } else {
+      // Check if continuing previous topic ladder or starting fresh
+      let existingTried = [];
+      if (session.ladder && session.ladder.topic === topic && session.ladder.tried && session.ladder.tried.length > 0) {
+        existingTried = session.ladder.tried;
+      }
+      const started = await startLadder({ userId: req.userId, topic, existingTried });
+      ladder = started.ladder;
+      style = started.style || 'theory';
+      reason = started.reason;
+      stylePlan = started.stylePlan;
+    }
+
     const avoidStyles = stylePlan.filter((s) => s.status === 'avoid').map((s) => s.style);
 
-    // Last few messages, so the mentor can answer in context
-    const history = session.messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    // Recent conversation, so the mentor answers in context
+    const history = session.messages.slice(-HISTORY_SIZE).map((m) => ({ role: m.role, content: m.content }));
 
-    const { reply, degraded } = await makeReply({
-      style: style || 'theory',
+    const { reply, check, degraded } = await makeReply({
+      style,
       topic,
       used,
       question: message,
       avoidStyles,
       history,
+      adaptation: buildAdaptation({ state, judged, levelChange }),
     });
 
     const messageId = newMessageId();
@@ -477,25 +646,28 @@ router.post('/', async (req, res, next) => {
       role: 'assistant',
       content: reply,
       topic,
-      style: style || 'theory',
+      style,
       degraded,
     });
 
+    // Remember the new check question so the next message is graded against it.
+    setPending(session, check, topic, messageId);
     session.set('ladder', ladder);
     await session.save();
 
-    // P1: Extract durable facts from free text if not small talk and not degraded
-    let extractedSaved = [];
-    let extractedUpdated = [];
-    if (!isSmallTalkMessage && !degraded) {
+    // P1: Extract durable facts from free text if not small talk, not an answer and not degraded
+    let extractedSaved = [...quizMemories.saved];
+    let extractedUpdated = [...quizMemories.updated];
+    memoriesSkipped.push(...quizMemories.skipped);
+    if (!isSmallTalkMessage && !isAnswer && !degraded) {
       try {
         const extraction = await extractFactsFromChat({
           userId: req.userId,
           message,
           messageId,
         });
-        extractedSaved = extraction.saved || [];
-        extractedUpdated = extraction.updated || [];
+        extractedSaved = [...extractedSaved, ...(extraction.saved || [])];
+        extractedUpdated = [...extractedUpdated, ...(extraction.updated || [])];
         if (extraction.skipped && extraction.skipped.length > 0) {
           memoriesSkipped.push(...extraction.skipped);
         }
@@ -510,7 +682,7 @@ router.post('/', async (req, res, next) => {
       messageId,
       reply,
       topic,
-      explanationStyle: style || 'theory',
+      explanationStyle: style,
       ladderStep: ladder.step,
       styleReason: reason,
       ladder,
@@ -521,6 +693,12 @@ router.post('/', async (req, res, next) => {
       memoriesSaved: extractedSaved,
       memoriesUpdated: extractedUpdated,
       memoriesSkipped,
+      understanding: understandingForResponse(state),
+      judgement: judged
+        ? { verdict: judged.verdict, whatRight: judged.whatRight, whatMissing: judged.whatMissing }
+        : null,
+      levelChange,
+      awaitingAnswer: Boolean(check),
       degraded,
       newBadges: gamification.newBadges,
       streak: gamification.streak,
