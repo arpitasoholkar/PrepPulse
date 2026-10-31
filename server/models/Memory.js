@@ -79,6 +79,18 @@ const memorySchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     default: null
+  },
+  // Semantic vector for MongoDB Vector Search. Written by memory/vectorIndex.js (native driver),
+  // hidden from normal queries so API responses and the Memory Vault never ship 768 floats.
+  embedding: {
+    type: [Number],
+    select: false,
+    default: undefined
+  },
+  embeddedAt: {
+    type: Date,
+    select: false,
+    default: undefined
   }
 }, {
   timestamps: true

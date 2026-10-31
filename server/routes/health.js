@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import { recallStatus } from '../memory/vectorIndex.js';
 
 const router = Router();
 
@@ -13,7 +14,8 @@ router.get(['/', '/health'], (req, res) => {
   res.status(200).json({
     ok: true,
     db: isConnected ? 'connected' : 'disconnected',
-    time: new Date().toISOString()
+    time: new Date().toISOString(),
+    recall: recallStatus()
   });
 });
 

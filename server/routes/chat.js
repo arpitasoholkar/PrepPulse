@@ -461,6 +461,7 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       userId,
       topic: targetTopic,
       limit: 5,
+      query: question || null,
     });
 
     const avoidStyles = stylePlan.filter((s) => s.status === 'avoid').map((s) => s.style);
@@ -594,6 +595,7 @@ router.post('/', async (req, res, next) => {
       userId: req.userId,
       topic,
       limit: 5,
+      query: isAnswer ? pending.question : message,
     });
 
     // 4. Update what we know about how well the student understands this topic.
@@ -799,7 +801,13 @@ router.post('/practice-review', async (req, res, next) => {
       });
     }
 
-    const used = await retrieveMemories({ userId: req.userId, topic: attempt.topic, limit: 5 });
+    const used = await retrieveMemories({
+      userId: req.userId,
+      topic: attempt.topic,
+      limit: 5,
+      query: [question ? question.title : '', attempt.errorType && attempt.errorType !== 'none' ? attempt.explanation : '']
+        .filter(Boolean).join('. ') || null,
+    });
     const history = session.messages.slice(-HISTORY_SIZE).map((m) => ({ role: m.role, content: m.content }));
 
     const { text, degraded } = await generateText({

@@ -154,7 +154,7 @@ Memory drives the mentor in two places:
 ## Architecture
 
 ```
-React 18 + Vite + Tailwind  ──REST (x-user-id)──▶️  Express API
+React 18 + Vite + Tailwind  ──REST (x-user-id)──▶  Express API
                                                      ├─ memory/   gate · lifecycle · retrieve · recall · styles · ladder · quiz
                                                      ├─ ai/       Gemini (primary + fallback model) with graceful degradation
                                                      └─ routes/   chat · practice · memories · dashboard · activity · profile · demo
@@ -242,7 +242,7 @@ Covers the forgetting curve, RRF, retrieval with the database stubbed, the exact
 
 ## API
 
-`POST /api/auth/login` · `GET /api/auth/me` · `POST /api/chat` · `GET|DELETE /api/chat/sessions[/:id]` · `POST /api/chat/feedback` · `GET /api/memories` · `PATCH|DELETE /api/memories/:id` · `GET /api/practice/questions` · `POST /api/practice/submit` · `GET /api/dashboard` · `GET /api/activity/summary` · `POST /api/activity/ping` · `GET|PATCH /api/profile` · `POST /api/demo/reset` · `GET /api/health`
+`POST /api/auth/login` · `GET /api/auth/me` · `POST /api/chat` · `GET|DELETE /api/chat/sessions[/:id]` · `POST /api/chat/feedback` · `POST /api/chat/practice-review` · `GET /api/memories` · `PATCH|DELETE /api/memories/:id` · `GET /api/practice/questions` · `POST /api/practice/submit` (optionally tagged with the chat `sessionId`, so the mentor reviews your code in the same conversation using the same recalled memories) · `GET /api/dashboard` · `GET /api/activity/summary` · `POST /api/activity/ping` · `GET|PATCH /api/profile` · `POST /api/demo/reset` · `GET /api/health`
 
 ---
 

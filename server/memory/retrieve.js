@@ -1,8 +1,13 @@
 // server/memory/retrieve.js  (Owner: C)
 // Finds the 5 most useful memories for the current question.
-// Score = topic match + type bonus + confidence + recency + corrected bonus.
+// Structured score = topic match + type bonus + confidence + retention (forgetting curve) + corrected bonus.
+// Optional semantic signal: MongoDB Vector Search ranks the same candidates by meaning, and the two
+// rankings are merged with Reciprocal Rank Fusion. If semantic recall is unavailable for any reason,
+// the structured ranking is used unchanged.
 
 import { Memory } from './deps.js';
+import { retention, fuseRankings } from './recall.js';
+import { semanticHits, backfillEmbeddings } from './vectorIndex.js';
 
 // Hardcoded prerequisite map: learning X needs Y first
 const PREREQS = {
@@ -38,11 +43,6 @@ function detectTopic(message) {
   return null;
 }
 
-function daysAgo(date) {
-  if (!date) return Infinity;
-  return (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24);
-}
-
 function scoreMemory(mem, topic, prereqs) {
   let score = 0;
   const reasons = [];
@@ -68,10 +68,11 @@ function scoreMemory(mem, topic, prereqs) {
 
   score += (mem.confidence || 0) * 2;
 
-  const recentDays = daysAgo(mem.lastVerified || mem.updatedAt || mem.createdAt);
-  if (recentDays <= 14) {
-    score += 1 - recentDays / 14; // up to +1, fades over 14 days
-  }
+  // Forgetting curve: +1 when just verified, decays exponentially; slower for well-evidenced,
+  // often-used or student-corrected memories (see recall.js).
+  const r = retention(mem);
+  score += r;
+  if (r < 0.75) reasons.push(`fading: retention ${Math.round(r * 100)}%`);
 
   if (mem.status === 'corrected') {
     score += 1;
@@ -82,10 +83,10 @@ function scoreMemory(mem, topic, prereqs) {
 }
 
 /**
- * retrieveMemories({ userId, topic, limit })
+ * retrieveMemories({ userId, topic, limit, query })
  * returns [{ memory, why, score }]  and updates useCount + lastUsedAt
  */
-async function retrieveMemories({ userId, topic, limit = 5 }) {
+async function retrieveMemories({ userId, topic, limit = 5, query = null }) {
   const prereqs = getPrereqs(topic);
 
   const all = await Memory.find({
@@ -109,9 +110,23 @@ async function retrieveMemories({ userId, topic, limit = 5 }) {
     )
     .sort((a, b) => b.score - a.score);
 
+  // Semantic recall (MongoDB Vector Search) + Reciprocal Rank Fusion. Fully optional:
+  // semanticHits() returns [] when unavailable and fuseRankings() then keeps the order as is.
+  let ranked = scored;
+  if (query && scored.length > 1) {
+    try {
+      const hits = await semanticHits({ userId, query });
+      ranked = fuseRankings({ structured: scored, semantic: hits });
+    } catch (err) {
+      ranked = scored;
+    }
+  }
+  // Embed any memory that has no vector yet (seed data, new memories). Background, never awaited.
+  backfillEmbeddings({ userId }).catch(() => {});
+
   // Section 4 requirement: Always include the best worked and the best failed
   // style memory for the topic if they exist, even when top limit would drop them.
-  let selected = scored.slice(0, limit);
+  let selected = ranked.slice(0, limit);
 
   if (topic) {
     const isBestWorked = (item) =>
@@ -124,12 +139,12 @@ async function retrieveMemories({ userId, topic, limit = 5 }) {
       item.memory.topic === topic &&
       item.memory.meta?.polarity === 'failed';
 
-    const bestWorked = scored.find(isBestWorked);
+    const bestWorked = ranked.find(isBestWorked);
     if (bestWorked && !selected.some((s) => String(s.memory._id) === String(bestWorked.memory._id))) {
       selected.push(bestWorked);
     }
 
-    const bestFailed = scored.find(isBestFailed);
+    const bestFailed = ranked.find(isBestFailed);
     if (bestFailed && !selected.some((s) => String(s.memory._id) === String(bestFailed.memory._id))) {
       selected.push(bestFailed);
     }

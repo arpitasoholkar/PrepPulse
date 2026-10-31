@@ -99,6 +99,11 @@ router.patch('/:id', async (req, res, next) => {
 
     await memory.save();
 
+    // The text changed, so the old semantic vector is stale. Drop it; it is re-embedded lazily.
+    try {
+      await Memory.collection.updateOne({ _id: memory._id }, { $unset: { embedding: '', embeddedAt: '' } });
+    } catch (e) { /* recall still works from the structured ranking */ }
+
     res.json({ memory });
   } catch (err) {
     next(err);

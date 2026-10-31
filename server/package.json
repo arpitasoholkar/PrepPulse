@@ -1,13 +1,15 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "IntelliPrep backend server",
+  "description": "PrepPulse backend: agentic memory engine",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "seed": "node seed/seed.js"
+    "seed": "node seed/seed.js",
+    "test": "node --test memory/recall.test.mjs memory/intent.test.mjs memory/understanding.test.mjs routes/chat.flow.test.mjs",
+    "recall:check": "node scripts/recall-check.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

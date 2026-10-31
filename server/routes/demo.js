@@ -6,6 +6,7 @@ import TopicMastery from '../models/TopicMastery.js';
 import CodingAttempt from '../models/CodingAttempt.js';
 import ChatSession from '../models/ChatSession.js';
 import Activity from '../models/Activity.js';
+import { backfillEmbeddings } from '../memory/vectorIndex.js';
 
 const router = Router();
 router.use(authenticate);
@@ -30,6 +31,9 @@ router.post('/reset', async (req, res, next) => {
 
     // Restore the baseline demo data via the seed function
     const result = await seedUser(userId);
+
+    // Embed the seeded memories for semantic recall (background; recall works without it).
+    backfillEmbeddings({ userId, force: true }).catch(() => {});
 
     res.json({
       ok: true,
