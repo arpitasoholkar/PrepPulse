@@ -9,6 +9,8 @@ const messageSchema = new mongoose.Schema({
   style: { type: String, default: null },
   explanationStyle: { type: String, enum: EXPLANATION_STYLES, default: null },
   memoriesUsed: [{ type: Object }],
+  // Everything the UI needs to redraw this reply later (style reason, ladder, level, grading...)
+  meta: { type: mongoose.Schema.Types.Mixed, default: null },
   degraded: { type: Boolean, default: false },
   feedback: { type: String, enum: ['understood', 'not_understood', null], default: null },
   timestamp: { type: Date, default: Date.now }
@@ -17,6 +19,7 @@ const messageSchema = new mongoose.Schema({
 const chatSessionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   sessionId: { type: String, required: true },
+  title: { type: String, default: '' },
   messages: [messageSchema],
   // Per-topic understanding profile: { [topic]: { level, streakRight, weakConcepts, ... } }
   understanding: { type: mongoose.Schema.Types.Mixed, default: {} },
@@ -37,5 +40,6 @@ const chatSessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 chatSessionSchema.index({ userId: 1, sessionId: 1 });
+chatSessionSchema.index({ userId: 1, updatedAt: -1 });
 
 export default mongoose.model('ChatSession', chatSessionSchema, 'chat_sessions');

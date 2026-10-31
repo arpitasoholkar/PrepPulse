@@ -32,13 +32,13 @@ const find = (userId, type, topic, concept, statuses = ['active', 'corrected']) 
 /**
  * @returns {Promise<{ saved: object[], updated: object[], skipped: object[] }>}
  */
-export async function recordQuizOutcome({ userId, topic, verdict, concept, question, refId }) {
+export async function recordQuizOutcome({ userId, topic, verdict, concept, question, refId, offline = false }) {
   const saved = [];
   const updated = [];
   const skipped = [];
 
   const label = (concept || topic || '').trim().toLowerCase();
-  const evidenceText = `Check question "${String(question || '').slice(0, 90)}" -> answered ${verdict}`;
+  const evidenceText = `Check question "${String(question || '').slice(0, 90)}" -> answered ${verdict}${offline ? ' (graded offline)' : ''}`;
 
   const type = verdict === 'correct' ? 'concept_understood' : 'mistake';
   const gate = shouldSave({ userId, type, topic, evidenceText, aboutLearning: true, importance: 3 });

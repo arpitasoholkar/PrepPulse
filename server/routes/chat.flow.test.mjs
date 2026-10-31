@@ -29,6 +29,26 @@ ChatSession.create = async (doc) => {
   return s;
 };
 
+ChatSession.aggregate = async () =>
+  [...sessions]
+    .filter((s) => s.messages.length > 0)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map((s) => ({
+      sessionId: s.sessionId,
+      title: s.title,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      topic: s.ladder.topic,
+      messageCount: s.messages.length,
+      firstMessage: s.messages[0].content,
+      lastMessage: s.messages.at(-1).content,
+    }));
+ChatSession.deleteOne = async ({ sessionId }) => {
+  const i = sessions.findIndex((s) => s.sessionId === sessionId);
+  if (i >= 0) sessions.splice(i, 1);
+  return { deletedCount: i >= 0 ? 1 : 0 };
+};
+
 const get = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 const matches = (m, q) =>
   Object.entries(q).every(([k, v]) => {
@@ -93,7 +113,7 @@ globalThis.fetch = async (url, opts) => {
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) };
 };
 
-const { default: chatRouter } = await import('../routes/chat.js');
+const { default: chatRouter } = await import('./chat.js');
 const app = express();
 app.use(express.json());
 app.use('/api/chat', chatRouter);
@@ -102,6 +122,23 @@ const server = http.createServer(app);
 await new Promise((r) => server.listen(0, r));
 const base = `http://127.0.0.1:${server.address().port}/api/chat`;
 const realFetch = globalThis.fetch;
+
+async function call(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : '';
+    const req = http.request(
+      base + path,
+      { method, headers: { 'content-type': 'application/json', 'x-user-id': USER_ID, 'content-length': Buffer.byteLength(payload) } },
+      (res) => {
+        let buf = '';
+        res.on('data', (c) => (buf += c));
+        res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(buf) }));
+      }
+    );
+    req.on('error', reject);
+    req.end(payload);
+  });
+}
 
 async function send(sessionId, message) {
   // our fake AI is global fetch, so call the test server through http instead
@@ -196,4 +233,61 @@ test('"I don\'t understand" lowers the level and re-explains with a new check qu
   assert.equal(r.levelChange, 0); // already basic
   assert.equal(r.understanding.level, 'basic');
   assert.equal(sessions.find((s) => s.sessionId === sid).pending.answer, '5');
+});
+
+test('chat history: list, reopen with full context, delete', async () => {
+  const sid = 'hist1';
+  memories.length = 0; // fresh student: starts at basic
+  await send(sid, 'Explain BFS for interviews');
+  await send(sid, '5');
+
+  // list: shows the chat with a title from the first message
+  let list = await call('GET', '/sessions');
+  const row = list.body.sessions.find((x) => x.sessionId === sid);
+  assert.ok(row);
+  assert.equal(row.title, 'Explain BFS for interviews');
+  assert.equal(row.messageCount, 4);
+  assert.equal(row.topic, 'graphs');
+
+  // reopen: every message comes back with what the UI needs to redraw it
+  const one = await call('GET', `/sessions/${sid}`);
+  assert.equal(one.status, 200);
+  assert.equal(one.body.messages.length, 4);
+  const ai = one.body.messages.filter((m) => m.role === 'assistant');
+  assert.ok(ai[0].meta.ladder.tried.length > 0);
+  assert.equal(ai[1].meta.judgement.verdict, 'correct');
+  assert.equal(ai[1].meta.understanding.level, 'basic');
+  assert.ok(Array.isArray(ai[0].memoriesUsed));
+  assert.equal(one.body.understanding.graphs.correct, 1);
+  assert.equal(one.body.awaitingAnswer, true); // a check question is still open
+
+  // continuing the reopened chat keeps its context and state
+  const r = await send(sid, '5');
+  assert.equal(r.understanding.streakRight, 0); // second correct answer in a row -> level up resets the streak
+  assert.equal(r.understanding.level, 'intermediate');
+
+  // a chat with no messages is not listed; unknown chat is 404; delete removes it
+  assert.equal((await call('GET', '/sessions/nope')).status, 404);
+  const del = await call('DELETE', `/sessions/${sid}`);
+  assert.equal(del.body.deleted, 1);
+  list = await call('GET', '/sessions');
+  assert.ok(!list.body.sessions.some((x) => x.sessionId === sid));
+});
+
+test('quiz outcome is still saved when the AI grader is down (offline grading)', async () => {
+  const sid = 'offline1';
+  await send(sid, 'Explain BFS');
+  const realGrade = globalThis.fetch;
+  const before = memories.length;
+  // grader fails, mentor still answers
+  globalThis.fetch = async (url, opts) => {
+    const sys = JSON.parse(opts.body).systemInstruction?.parts?.[0]?.text || '';
+    if (sys.startsWith('You grade')) throw new Error('boom');
+    return realGrade(url, opts);
+  };
+  const r = await send(sid, '5');
+  globalThis.fetch = realGrade;
+  assert.equal(r.judgement.verdict, 'correct'); // text comparison with the stored answer
+  assert.ok(memories.length >= before);
+  assert.ok(memories.some((m) => m.evidence.some((e) => /graded offline/.test(e.text))));
 });

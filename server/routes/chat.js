@@ -4,6 +4,7 @@
 
 import express from 'express';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { authenticate } from '../middleware/auth.js';
 import ChatSession from '../models/ChatSession.js';
 import { TOPICS } from '../memory/deps.js';
@@ -37,6 +38,23 @@ import {
 import { recordQuizOutcome } from '../memory/quiz.js';
 
 const HISTORY_SIZE = 12;
+
+// What the UI needs to redraw an assistant reply when an old chat is reopened.
+const messageMeta = (r) => ({
+  styleReason: r.styleReason || null,
+  ladderStep: r.ladderStep ?? 0,
+  ladder: r.ladder || null,
+  stylePlan: r.stylePlan || [],
+  understanding: r.understanding || null,
+  judgement: r.judgement || null,
+  levelChange: r.levelChange || 0,
+  awaitingAnswer: Boolean(r.awaitingAnswer),
+});
+
+const makeTitle = (text) => {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  return t.length > 60 ? `${t.slice(0, 57)}...` : t;
+};
 
 // Try loading Person A's intent detector if present, otherwise fallback
 let detectFeedbackIntent = null;
@@ -404,6 +422,7 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
         topic: targetTopic,
         style: null,
         degraded: false,
+        meta: messageMeta({ styleReason: 'Ladder exhausted', ladder, stylePlan, understanding: understandingForResponse(stepDown.state) }),
       });
 
       await session.save();
@@ -458,6 +477,16 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       topic: targetTopic,
       style: nextStyle,
       degraded,
+      memoriesUsed: usedForResponse(used),
+      meta: messageMeta({
+        styleReason: reason,
+        ladderStep: ladder.step,
+        ladder,
+        stylePlan,
+        understanding: understandingForResponse(stepDown.state),
+        levelChange: stepDown.levelChange,
+        awaitingAnswer: Boolean(check),
+      }),
     });
 
     await session.save();
@@ -567,19 +596,21 @@ router.post('/', async (req, res, next) => {
       state = out.state;
       levelChange = out.levelChange;
 
-      if (!judged.degraded) {
-        try {
-          quizMemories = await recordQuizOutcome({
-            userId: req.userId,
-            topic,
-            verdict: judged.verdict,
-            concept: judged.concept,
-            question: pending.question,
-            refId: pending.messageId,
-          });
-        } catch (err) {
-          // memory is best effort, never block the lesson
-        }
+      // Saved even when the AI grader was down (the offline text comparison still gave a verdict).
+      try {
+        quizMemories = await recordQuizOutcome({
+          userId: req.userId,
+          topic,
+          verdict: judged.verdict,
+          concept: judged.concept,
+          question: pending.question,
+          refId: pending.messageId,
+          offline: judged.degraded,
+        });
+      } catch (err) {
+        // never block the lesson, but do not hide the failure either
+        console.error('[memory] could not save quiz outcome:', err.message);
+        quizMemories.skipped.push({ text: pending.question, reason: `could not save: ${err.message}` });
       }
     } else {
       state = rememberQuestion(state, message);
@@ -641,14 +672,29 @@ router.post('/', async (req, res, next) => {
       topic,
     });
 
-    session.messages.push({
+    const assistantMsg = {
       id: messageId,
       role: 'assistant',
       content: reply,
       topic,
       style,
       degraded,
-    });
+      memoriesUsed: usedForResponse(used),
+      meta: messageMeta({
+        styleReason: reason,
+        ladderStep: ladder.step,
+        ladder,
+        stylePlan,
+        understanding: understandingForResponse(state),
+        judgement: judged
+          ? { verdict: judged.verdict, whatRight: judged.whatRight, whatMissing: judged.whatMissing }
+          : null,
+        levelChange,
+        awaitingAnswer: Boolean(check),
+      }),
+    };
+    session.messages.push(assistantMsg);
+    if (!session.title) session.title = makeTitle(message);
 
     // Remember the new check question so the next message is graded against it.
     setPending(session, check, topic, messageId);
@@ -703,6 +749,89 @@ router.post('/', async (req, res, next) => {
       newBadges: gamification.newBadges,
       streak: gamification.streak,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/chat/sessions : chat history list ----------
+router.get('/sessions', async (req, res, next) => {
+  try {
+    const rows = await ChatSession.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(req.userId), 'messages.0': { $exists: true } } },
+      { $sort: { updatedAt: -1 } },
+      { $limit: 100 },
+      {
+        $project: {
+          _id: 0,
+          sessionId: 1,
+          title: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          topic: '$ladder.topic',
+          messageCount: { $size: '$messages' },
+          firstMessage: { $arrayElemAt: ['$messages.content', 0] },
+          lastMessage: { $arrayElemAt: ['$messages.content', -1] },
+        },
+      },
+    ]);
+
+    res.json({
+      sessions: rows.map((r) => ({
+        sessionId: r.sessionId,
+        title: r.title || makeTitle(r.firstMessage) || 'Untitled chat',
+        topic: r.topic || null,
+        messageCount: r.messageCount,
+        preview: makeTitle(r.lastMessage).slice(0, 90),
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/chat/sessions/:sessionId : one full chat, to reopen it ----------
+router.get('/sessions/:sessionId', async (req, res, next) => {
+  try {
+    const session = await ChatSession.findOne({ userId: req.userId, sessionId: req.params.sessionId });
+    if (!session) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Chat not found' } });
+    }
+    const plainSession = session.toObject ? session.toObject() : session;
+
+    res.json({
+      sessionId: plainSession.sessionId,
+      title: plainSession.title || makeTitle(plainSession.messages?.[0]?.content) || 'Untitled chat',
+      topic: plainSession.ladder?.topic || null,
+      ladder: plainSession.ladder || null,
+      understanding: plainSession.understanding || {},
+      awaitingAnswer: Boolean(plainSession.pending && plainSession.pending.question),
+      updatedAt: plainSession.updatedAt,
+      messages: (plainSession.messages || []).map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        topic: m.topic || null,
+        style: m.style || null,
+        degraded: Boolean(m.degraded),
+        feedback: m.feedback || null,
+        memoriesUsed: m.memoriesUsed || [],
+        meta: m.meta || null,
+        timestamp: m.timestamp,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- DELETE /api/chat/sessions/:sessionId ----------
+router.delete('/sessions/:sessionId', async (req, res, next) => {
+  try {
+    const out = await ChatSession.deleteOne({ userId: req.userId, sessionId: req.params.sessionId });
+    res.json({ deleted: out.deletedCount || 0 });
   } catch (err) {
     next(err);
   }
