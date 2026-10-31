@@ -1,13 +1,11 @@
 // server/routes/chat.js  (Owner: C)
 // POST /api/chat           -> memory-aware reply
 // POST /api/chat/feedback  -> "I understood" / "I didn't understand"
-// B's app.js auto-loads this file and mounts it under /api.
+// app.js mounts this file at /api/chat, so routes here are '/' and '/feedback'.
 
 import express from 'express';
 import crypto from 'crypto';
-
-const router = express.Router();
-
+import { authenticate } from '../middleware/auth.js';
 import ChatSession from '../models/ChatSession.js';
 import { TOPICS } from '../memory/deps.js';
 import { generateText, generateJSON } from '../ai/gemini.js';
@@ -15,6 +13,9 @@ import { buildMentorSystem, buildMentorPrompt, fallbackReply } from '../ai/promp
 import { retrieveMemories, detectTopic } from '../memory/retrieve.js';
 import { startLadder, nextStep } from '../memory/ladder.js';
 import { saveUnderstood } from '../memory/extract.js';
+
+const router = express.Router();
+router.use(authenticate);
 
 const badRequest = (message) => ({ status: 400, error: { code: 'BAD_REQUEST', message } });
 
@@ -63,7 +64,7 @@ const usedForResponse = (used) =>
   used.map((x) => ({ memory: x.memory, why: x.why, score: x.score }));
 
 // ---------- POST /api/chat ----------
-router.post('/chat', async (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
     const { sessionId, message } = req.body || {};
     if (!sessionId || !message || !String(message).trim()) {
@@ -102,7 +103,7 @@ router.post('/chat', async (req, res, next) => {
 });
 
 // ---------- POST /api/chat/feedback ----------
-router.post('/chat/feedback', async (req, res, next) => {
+router.post('/feedback', async (req, res, next) => {
   try {
     const { sessionId, messageId, understood } = req.body || {};
     if (!sessionId || !messageId || typeof understood !== 'boolean') {
