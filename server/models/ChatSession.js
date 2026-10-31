@@ -26,6 +26,8 @@ const chatSessionSchema = new mongoose.Schema({
   // The check question the mentor asked last and is waiting for an answer to:
   // { question, answer, concept, topic, messageId, askedAt }  (or null)
   pending: { type: mongoose.Schema.Types.Mixed, default: null },
+  // The student's latest code-editor attempt for this chat (so follow-up questions can use the code)
+  practice: { type: mongoose.Schema.Types.Mixed, default: null },
   ladder: {
     topic: { type: String, default: null },
     step: { type: Number, default: 0 },

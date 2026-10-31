@@ -40,6 +40,11 @@ const codingAttemptSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // The mentor chat this attempt came from (so the mentor can resume that same chat)
+  sessionId: {
+    type: String,
+    default: ''
+  },
   timestamp: {
     type: Date,
     default: Date.now

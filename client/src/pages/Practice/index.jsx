@@ -8,6 +8,7 @@ import { getErrorMessage } from '../../api/client.js';
 import { getQuestions, submitSolution } from '../../api/practice.js';
 import QuestionList from './QuestionList.jsx';
 import ResultCard from './ResultCard.jsx';
+import { getHandoff } from '../../lib/handoff.js';
 
 const errorText = (err) => getErrorMessage(err);
 
@@ -24,6 +25,8 @@ export default function Practice() {
   const [error, setError] = useState(null);
 
   const resultRef = useRef(null);
+  // Set when the mentor sent the student here: which chat to return to, and which topic to practise.
+  const handoffRef = useRef(getHandoff());
 
   const loadQuestions = useCallback(async () => {
     setLoadingList(true);
@@ -40,7 +43,10 @@ export default function Practice() {
         });
         return next;
       });
-      setSelectedId((prev) => prev || list[0]?.id || null);
+      // Only jump to a topic question when the mentor's own button sent the student here
+      const wantedTopic = handoffRef.current?.pick ? handoffRef.current.topic : null;
+      const forTopic = wantedTopic ? list.find((q) => q.topic === wantedTopic) : null;
+      setSelectedId((prev) => prev || forTopic?.id || list[0]?.id || null);
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -73,6 +79,7 @@ export default function Practice() {
         questionId: question.id,
         code,
         language: question.language || 'javascript',
+        sessionId: handoffRef.current?.sessionId || undefined,
       });
       setResultById((prev) => ({ ...prev, [question.id]: res.data }));
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
@@ -100,6 +107,29 @@ export default function Practice() {
       e.preventDefault();
       handleSubmit();
     }
+  };
+
+  // Back to the mentor. The mentor reviews this attempt, in the same chat if we came from one.
+  // `prefill` keeps the original "Ask mentor" behaviour (a ready-typed question in the input box).
+  const goBackToMentor = (prefill) => {
+    const attemptId = result?.attemptId;
+    if (!attemptId) {
+      navigate('/mentor', prefill ? { state: { prefill, at: Date.now() } } : undefined);
+      return;
+    }
+    navigate('/mentor', {
+      state: {
+        resumeSession: handoffRef.current?.sessionId || null,
+        reviewAttemptId: attemptId,
+        prefill: prefill || undefined,
+        at: Date.now(),
+      },
+    });
+  };
+
+  const askMentor = () => {
+    const err = result?.errorType && result.errorType !== 'none' ? result.errorType.replace(/_/g, ' ') : null;
+    goBackToMentor(err ? `Explain ${err} in ${question.topic}` : `Explain ${question.topic}`);
   };
 
   const clearResult = () =>
@@ -207,14 +237,8 @@ export default function Practice() {
                     <ResultCard
                       result={result}
                       onTryAgain={clearResult}
-                      onContinueLearning={() => navigate('/mentor', { state: { continueLearning: true, at: Date.now() } })}
-                      onAskMentor={() => {
-                        const err = result?.errorType && result.errorType !== 'none' ? result.errorType.replace(/_/g, ' ') : null;
-                        const prefill = err
-                          ? `Explain ${err} in ${question.topic}`
-                          : `Explain ${question.topic}`;
-                        navigate('/mentor', { state: { prefill, at: Date.now() } });
-                      }}
+                      onContinueLearning={() => goBackToMentor()}
+                      onAskMentor={askMentor}
                     />
                   </div>
                 )}

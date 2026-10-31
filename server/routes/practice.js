@@ -87,7 +87,7 @@ function normaliseVerdict(raw, total) {
 // ---------- POST /api/practice/submit ----------
 router.post('/practice/submit', authenticate, async (req, res, next) => {
   try {
-    const { questionId, code } = req.body || {};
+    const { questionId, code, sessionId } = req.body || {};
     const question = questions.find((q) => q.id === questionId);
 
     if (!question) {
@@ -134,6 +134,7 @@ router.post('/practice/submit', authenticate, async (req, res, next) => {
       explanation: verdict.explanation,
       testsPassed: verdict.testsPassed,
       testsTotal: verdict.testsTotal,
+      sessionId: typeof sessionId === 'string' ? sessionId.slice(0, 100) : '',
       timestamp: new Date(),
     });
 

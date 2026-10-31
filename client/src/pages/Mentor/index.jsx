@@ -6,7 +6,8 @@ import { useUser } from '../../context/UserContext.jsx';
 import ErrorBanner from '../../components/ErrorBanner.jsx';
 import Loader from '../../components/Loader.jsx';
 import { getErrorMessage } from '../../api/client.js';
-import { sendMessage, sendFeedback, listSessions, getSession, deleteSession } from '../../api/chat.js';
+import { sendMessage, sendFeedback, listSessions, getSession, deleteSession, reviewPractice } from '../../api/chat.js';
+import { setHandoff, clearHandoff } from '../../lib/handoff.js';
 import MessageBubble from './MessageBubble.jsx';
 import MemoriesUsedPanel from './MemoriesUsedPanel.jsx';
 import ChatHistoryPanel from './ChatHistoryPanel.jsx';
@@ -67,7 +68,8 @@ const fromSaved = (m) => {
     judgement: meta.judgement || null,
     levelChange: meta.levelChange || 0,
     awaitingAnswer: Boolean(meta.awaitingAnswer),
-    feedback: m.feedback || null,
+    // The review of an editor attempt has no "I understood" buttons
+    feedback: m.feedback || (meta.practiceAttemptId ? 'done' : null),
   };
 };
 
@@ -111,6 +113,7 @@ export default function Mentor() {
   const busyRef = useRef(false); // blocks double clicks before React re-renders
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const reviewedRef = useRef(null); // stops the same editor attempt being reviewed twice
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -346,6 +349,65 @@ export default function Mentor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state?.newSession]);
 
+  // Coming back from the code editor: reopen the SAME chat, then the mentor reviews the attempt.
+  useEffect(() => {
+    const { resumeSession, reviewAttemptId } = location.state || {};
+    if (!reviewAttemptId || reviewedRef.current === reviewAttemptId) return;
+    reviewedRef.current = reviewAttemptId;
+
+    (async () => {
+      busyRef.current = true;
+      setLoading(true);
+      setError(null);
+      let target = sessionId;
+      try {
+        if (resumeSession) {
+          try {
+            const res = await getSession(resumeSession);
+            setSessionId(resumeSession);
+            setMessages((res.data?.messages || []).map(fromSaved));
+            setSaved([]);
+            setSkipped([]);
+            target = resumeSession;
+          } catch (err) {
+            // That chat is gone (deleted): fall through and review in a fresh chat.
+          }
+        }
+        const res = await reviewPractice({ sessionId: target, attemptId: reviewAttemptId });
+        const ai = toAiMessage({ ...res.data, ladder: null }, 'done');
+        if (!res.data.alreadyRecorded) {
+          appendMessage(ai);
+          setSelectedId(ai.id);
+        }
+        refreshHistory();
+      } catch (err) {
+        setError(errorText(err));
+      } finally {
+        clearHandoff();
+        busyRef.current = false;
+        setLoading(false);
+        // Drop the router state so a refresh does not run this again.
+        navigate(location.pathname, { replace: true, state: null });
+        inputRef.current?.focus();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.reviewAttemptId, location.state?.at]);
+
+  // Always remember which chat is open, so coming back from the editor lands in THIS chat
+  // however the student left (the mentor's button, the navbar, the browser back button).
+  useEffect(() => {
+    if (messages.length > 0) setHandoff({ sessionId, topic: lastAi?.topic || null, pick: false });
+    else clearHandoff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, messages.length]);
+
+  // The mentor sends the student to the code editor (pick: open a question on this topic).
+  const goToEditor = (topic) => {
+    setHandoff({ sessionId, topic: topic || lastAi?.topic || null, pick: true });
+    navigate('/practice');
+  };
+
   // The header search box links here with { prefill } state.
   useEffect(() => {
     if (location.state?.prefill) {
@@ -456,7 +518,7 @@ export default function Mentor() {
                   onSelect={() => m.role === 'assistant' && setSelectedId(m.id)}
                   onUnderstood={() => handleFeedback(m, true)}
                   onNotUnderstood={() => handleFeedback(m, false)}
-                  onGoPractice={() => navigate('/practice')}
+                  onGoPractice={() => goToEditor(m.topic)}
                   onAskLine={() => inputRef.current?.focus()}
                 />
               ))}

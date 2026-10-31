@@ -13,6 +13,7 @@ mongoose.set('bufferCommands', false); // any real DB call fails fast (gamificat
 const { default: User } = await import('../models/User.js');
 const { default: ChatSession } = await import('../models/ChatSession.js');
 const { default: Memory } = await import('../models/Memory.js');
+const { default: CodingAttempt } = await import('../models/CodingAttempt.js');
 
 // ---------- fake database ----------
 const USER_ID = new mongoose.Types.ObjectId().toString();
@@ -85,6 +86,7 @@ Memory.findByIdAndUpdate = async (id, upd) => {
 
 // ---------- fake AI ----------
 const mentorSystems = [];
+const reviewPrompts = [];
 globalThis.fetch = async (url, opts) => {
   const body = JSON.parse(opts.body);
   const system = body.systemInstruction?.parts?.[0]?.text || '';
@@ -105,7 +107,11 @@ globalThis.fetch = async (url, opts) => {
     text = JSON.stringify({ topic: 'graphs' });
   } else if (system.startsWith('You extract')) {
     text = JSON.stringify({ facts: [] });
-  } else {
+  } 
+  else if (system.includes('just come back from the code editor')) {
+    reviewPrompts.push(prompt);
+    text = 'I saw your attempt on the editor. Your base case is missing, so the recursion never stops.';}
+    else {
     mentorSystems.push(system);
     text =
       'Here is the explanation.\n\nWhat is the answer?\n[[CHECK]]{"question":"What is the answer?","answer":"5","concept":"bfs order"}[[/CHECK]]';
@@ -290,4 +296,64 @@ test('quiz outcome is still saved when the AI grader is down (offline grading)',
   assert.equal(r.judgement.verdict, 'correct'); // text comparison with the stored answer
   assert.ok(memories.length >= before);
   assert.ok(memories.some((m) => m.evidence.some((e) => /graded offline/.test(e.text))));
+});
+
+test('code editor -> back to the SAME chat: mentor reviews the attempt, then the chat continues with the code in context', async () => {
+  const attemptId = new mongoose.Types.ObjectId().toString();
+  const attempt = {
+    _id: attemptId,
+    userId: USER_ID,
+    questionId: 'rec_sum_digits',
+    topic: 'recursion',
+    code: 'function sumDigits(n) { return sumDigits(n - 1); }',
+    result: 'fail',
+    errorType: 'logic_error',
+    explanation: 'There is no base case.',
+    testsPassed: 1,
+    testsTotal: 5,
+  };
+  CodingAttempt.findOne = (q) => ({
+    lean: async () => (String(q._id) === attemptId && String(q.userId) === USER_ID ? attempt : null),
+  });
+
+  const sid = 'prac1';
+  await send(sid, 'Explain recursion'); // the mentor chat the student was in
+  const session = sessions.find((s) => s.sessionId === sid);
+  const before = session.messages.length;
+  assert.equal(before, 2);
+
+  // Student comes back from the editor: review lands in the same session
+  let r = await call('POST', '/practice-review', { sessionId: sid, attemptId });
+  assert.equal(r.status, 200);
+  assert.match(r.body.reply, /I saw your attempt/);
+  assert.equal(r.body.alreadyRecorded, false);
+  assert.equal(session.messages.length, before + 1);
+  assert.equal(session.messages.at(-1).role, 'assistant');
+  assert.equal(session.messages.at(-1).meta.practiceAttemptId, attemptId);
+  assert.equal(session.pending, null); // the old check question no longer applies
+  assert.equal(sessions.filter((s) => s.sessionId === sid).length, 1); // no second session created
+  assert.match(reviewPrompts.at(-1), /function sumDigits/); // the review saw the real code
+  assert.match(reviewPrompts.at(-1), /There is no base case/);
+  assert.match(reviewPrompts.at(-1), /Explain recursion/); // and the earlier conversation
+
+  // Calling it again (page refresh, double click) does not add a second review
+  r = await call('POST', '/practice-review', { sessionId: sid, attemptId });
+  assert.equal(r.body.alreadyRecorded, true);
+  assert.equal(session.messages.length, before + 1);
+
+  // The chat resumes normally, and the mentor can see the student's code
+  await send(sid, 'why did my code fail?');
+  assert.match(mentorSystems.at(-1), /latest code-editor attempt/);
+  assert.match(mentorSystems.at(-1), /function sumDigits/);
+  assert.equal(session.messages.length, before + 3);
+
+  // Reopening the chat from history keeps the review (so it survives a reload)
+  r = await call('GET', `/sessions/${sid}`);
+  assert.ok(r.body.messages.some((m) => m.meta && m.meta.practiceAttemptId === attemptId));
+
+  // Someone else's attempt, or a bad id, is refused
+  r = await call('POST', '/practice-review', { sessionId: sid, attemptId: new mongoose.Types.ObjectId().toString() });
+  assert.equal(r.status, 404);
+  r = await call('POST', '/practice-review', { sessionId: sid, attemptId: 'nope' });
+  assert.equal(r.status, 400);
 });

@@ -20,7 +20,21 @@ function memoryLines(memories) {
     .join('\n');
 }
 
-function buildMentorSystem({ style, topic, memories, avoidStyles = [], adaptation = '' }) {
+function practiceLines(practice) {
+  if (!practice) return '';
+  return `
+
+The student's latest code-editor attempt in this chat (you already reviewed it with them; use it when they ask about their code or that problem):
+Problem: ${practice.title} (${practice.topic})
+Verdict: ${practice.result} (${practice.testsPassed}/${practice.testsTotal} tests), error type: ${practice.errorType}
+Judge note: ${practice.explanation || '(none)'}
+Their code:
+\`\`\`
+${String(practice.code || '').slice(0, 3000)}
+\`\`\``;
+}
+
+function buildMentorSystem({ style, topic, memories, avoidStyles = [], adaptation = '', practice = null }) {
   const avoidInstruction = avoidStyles && avoidStyles.length > 0
     ? `\n- Do NOT use styles: ${avoidStyles.join(', ')}; they did not work for this student. Do not mention this list unless asked.`
     : '';
@@ -35,7 +49,7 @@ How well this student is understanding right now (follow this closely, it decide
 ${adaptation || 'No information yet: start at a basic level.'}
 
 What you know about this student (memories):
-${memoryLines(memories)}
+${memoryLines(memories)}${practiceLines(practice)}
 
 How to answer:
 1. Answer EXACTLY what the student asked, in a detailed but crisp, on-point way. About 250 to 400 words (code blocks do not count). No long introductions, no filler.
@@ -47,7 +61,7 @@ How to answer:
 7. Compute every worked example before writing it. Use small numbers. If unsure, use a simpler example.
 8. Never claim to remember anything that is not in the lists above.
 9. Use the conversation so far. If they say "continue", "next" or "what next", move to the next piece.
-10. Use markdown. Put code and diagrams in code blocks. Visual style means an ASCII diagram or call-stack trace.
+10. Use markdown. Put code and diagrams in code blocks. Visual style means an ASCII diagram or call-stack trace. If a hands-on coding exercise would help, say in one sentence that they can open the Practice code editor, solve a problem there, and come back to this chat so you can review their code.
 11. End the visible reply with exactly ONE check question at the level described above, for example "what is the output of this?", "in what order are the nodes visited?", "what is the time complexity and why?". It must be answerable in a short reply. Never put the answer in the reply.
 12. After that question, on a new last line, add this hidden block (the app removes it, never mention it):
 [[CHECK]]{"question":"the same question","answer":"the correct short answer, computed carefully","concept":"1 to 3 lowercase words naming the concept being tested"}[[/CHECK]]`;
@@ -99,6 +113,48 @@ Student reply: ${String(studentReply).slice(0, 800)}`;
 
 const JUDGE_SCHEMA = '{ "isAnswer": true, "verdict": "correct | partial | wrong", "whatRight": "", "whatMissing": "", "misconception": "", "concept": "" }';
 
+// The student just came back from the code editor: the mentor reviews that attempt.
+function buildPracticeReviewSystem({ memories }) {
+  return `You are IntelliPrep, a friendly DSA placement mentor for Indian college students.
+The student has just come back from the code editor to this chat. Write ONE short message (80 to 150 words) reviewing the attempt you are given.
+
+Rules:
+- If it PASSED: the FIRST line must be a short celebration with an emoji (for example "🎉 Wow, you nailed it!"). Then praise something specific from THEIR code (a good base case, a clean approach, etc). Add at most one improvement idea (an edge case or complexity).
+- If it FAILED: the FIRST line must be a short encouraging line (for example "Good try, you are close!"). Then give **What went wrong:** pointing at a real line or construct in THEIR code, and **Hint:** a nudge toward the fix. Never give the full solution.
+- Always mention that you saw their attempt from the code editor.
+- If a memory shows the same kind of mistake happened before, mention it in one sentence. Never claim to remember anything not listed.
+- The result comes from an AI review of the code, not from actually running it. Do not say tests were executed.
+- End by inviting them to continue (retry, walk through the fix, or move on). Do not ask a quiz question. No hidden blocks.
+- Use markdown. Short code snippets in code blocks are fine.
+
+What you know about this student (memories):
+${memoryLines(memories)}`;
+}
+
+function buildPracticeReviewPrompt({ attempt, question, history = [] }) {
+  const past = historyText(history);
+  const pastBlock = past ? `Conversation so far:\n${past}\n\n` : '';
+  return `${pastBlock}Problem: ${question ? question.title : attempt.questionId} (${attempt.topic})
+${question ? `Task given: ${question.prompt}\n` : ''}Result: ${attempt.result} (${attempt.testsPassed}/${attempt.testsTotal} tests)
+Error type: ${attempt.errorType}
+Judge note: ${attempt.explanation || '(none)'}
+
+Student's code:
+\`\`\`
+${String(attempt.code).slice(0, 3000)}
+\`\`\`
+
+Write the review message now.`;
+}
+
+function practiceFallbackReview(attempt, question) {
+  const title = question ? question.title : attempt.questionId;
+  if (attempt.result === 'pass') {
+    return `🎉 **Wow, you got it right!**\n\nI saw your attempt on **${title}** in the code editor and it passed (${attempt.testsPassed}/${attempt.testsTotal}). Great work! Want to try a harder one, or go deeper into **${attempt.topic}**?`;
+  }
+  return `**Good try, you are close!**\n\nI saw your attempt on **${title}** in the code editor and it did not pass yet (${attempt.testsPassed}/${attempt.testsTotal}).${attempt.explanation ? `\n\n**What went wrong:** ${attempt.explanation}` : ''}\n\nWant to walk through the fix, or go back and retry?`;
+}
+
 // Used when Gemini is down so the demo never shows a blank screen
 function fallbackReply(topic, style) {
   const t = topic || 'this topic';
@@ -108,6 +164,9 @@ function fallbackReply(topic, style) {
 export {
   buildMentorSystem,
   buildMentorPrompt,
+  buildPracticeReviewSystem,
+  buildPracticeReviewPrompt,
+  practiceFallbackReview,
   buildJudgeSystem,
   buildJudgePrompt,
   JUDGE_SCHEMA,

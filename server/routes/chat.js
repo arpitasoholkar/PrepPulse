@@ -5,13 +5,17 @@
 import express from 'express';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import fs from 'fs';
 import { authenticate } from '../middleware/auth.js';
 import ChatSession from '../models/ChatSession.js';
-import { TOPICS } from '../memory/deps.js';
+import { TOPICS, CodingAttempt } from '../memory/deps.js';
 import { generateText, generateJSON } from '../ai/gemini.js';
 import {
   buildMentorSystem,
   buildMentorPrompt,
+  buildPracticeReviewSystem,
+  buildPracticeReviewPrompt,
+  practiceFallbackReview,
   buildJudgeSystem,
   buildJudgePrompt,
   JUDGE_SCHEMA,
@@ -38,6 +42,10 @@ import {
 import { recordQuizOutcome } from '../memory/quiz.js';
 
 const HISTORY_SIZE = 12;
+
+const practiceQuestions = JSON.parse(
+  fs.readFileSync(new URL('../data/questions.json', import.meta.url), 'utf-8')
+);
 
 // What the UI needs to redraw an assistant reply when an old chat is reopened.
 const messageMeta = (r) => ({
@@ -131,7 +139,7 @@ async function resolveTopic(message, session) {
   return (session.ladder && session.ladder.topic) || null;
 }
 
-async function makeReply({ style, topic, used, question, previousReply, avoidStyles = [], history = [], adaptation = '' }) {
+async function makeReply({ style, topic, used, question, previousReply, avoidStyles = [], history = [], adaptation = '', practice = null }) {
   const { text, degraded } = await generateText({
     system: buildMentorSystem({
       style,
@@ -139,6 +147,7 @@ async function makeReply({ style, topic, used, question, previousReply, avoidSty
       memories: used,
       avoidStyles,
       adaptation,
+      practice,
     }),
     prompt: buildMentorPrompt({
       question,
@@ -465,6 +474,7 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       avoidStyles,
       history: session.messages.slice(-HISTORY_SIZE).map((m) => ({ role: m.role, content: m.content })),
       adaptation: buildAdaptation({ state: stepDown.state, levelChange: stepDown.levelChange }),
+      practice: session.practice || null,
     });
 
     const newId = newMessageId();
@@ -661,6 +671,7 @@ router.post('/', async (req, res, next) => {
       avoidStyles,
       history,
       adaptation: buildAdaptation({ state, judged, levelChange }),
+      practice: session.practice || null,
     });
 
     const messageId = newMessageId();
@@ -748,6 +759,100 @@ router.post('/', async (req, res, next) => {
       degraded,
       newBadges: gamification.newBadges,
       streak: gamification.streak,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- POST /api/chat/practice-review ----------
+// The student came back from the code editor. The mentor reviews that attempt inside the SAME chat
+// session (so the chat continues with full context). Safe to call twice: it never adds a duplicate.
+router.post('/practice-review', async (req, res, next) => {
+  try {
+    const { sessionId, attemptId } = req.body || {};
+    if (!sessionId || !attemptId || !mongoose.isValidObjectId(attemptId)) {
+      const e = badRequest('sessionId and a valid attemptId are required');
+      return res.status(e.status).json({ error: e.error });
+    }
+
+    const attempt = await CodingAttempt.findOne({ _id: attemptId, userId: req.userId }).lean();
+    if (!attempt) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Practice attempt not found' } });
+    }
+
+    const session = await getOrCreateSession(req.userId, sessionId);
+    const question = practiceQuestions.find((q) => q.id === attempt.questionId) || null;
+
+    // Already reviewed in this chat: return the saved review instead of writing a second one.
+    const existing = session.messages.find((m) => m.meta && m.meta.practiceAttemptId === String(attempt._id));
+    if (existing) {
+      return res.json({
+        messageId: existing.id,
+        reply: existing.content,
+        topic: existing.topic,
+        explanationStyle: 'code review',
+        memoriesUsed: existing.memoriesUsed || [],
+        awaitingAnswer: false,
+        degraded: Boolean(existing.degraded),
+        alreadyRecorded: true,
+      });
+    }
+
+    const used = await retrieveMemories({ userId: req.userId, topic: attempt.topic, limit: 5 });
+    const history = session.messages.slice(-HISTORY_SIZE).map((m) => ({ role: m.role, content: m.content }));
+
+    const { text, degraded } = await generateText({
+      system: buildPracticeReviewSystem({ memories: used }),
+      prompt: buildPracticeReviewPrompt({ attempt, question, history }),
+    });
+    const reply = degraded || !text ? practiceFallbackReview(attempt, question) : text.trim();
+
+    const messageId = newMessageId();
+    session.messages.push({
+      id: messageId,
+      role: 'assistant',
+      content: reply,
+      topic: attempt.topic,
+      style: 'code review',
+      degraded: Boolean(degraded || !text),
+      memoriesUsed: usedForResponse(used),
+      meta: {
+        ...messageMeta({
+          styleReason: `Reviewing your code from the editor (${attempt.result === 'pass' ? 'passed' : 'not passed yet'})`,
+          awaitingAnswer: false,
+        }),
+        practiceAttemptId: String(attempt._id),
+        practiceResult: attempt.result,
+      },
+    });
+
+    // Later questions in this chat can refer to this code; any old check question is no longer relevant.
+    session.set('practice', {
+      attemptId: String(attempt._id),
+      questionId: attempt.questionId,
+      title: question ? question.title : attempt.questionId,
+      topic: attempt.topic,
+      code: String(attempt.code).slice(0, 3000),
+      result: attempt.result,
+      testsPassed: attempt.testsPassed,
+      testsTotal: attempt.testsTotal,
+      errorType: attempt.errorType,
+      explanation: attempt.explanation,
+    });
+    session.set('pending', null);
+    if (!session.title) session.title = makeTitle(`Practice: ${question ? question.title : attempt.topic}`);
+    await session.save();
+
+    return res.json({
+      messageId,
+      reply,
+      topic: attempt.topic,
+      explanationStyle: 'code review',
+      memoriesUsed: usedForResponse(used),
+      awaitingAnswer: false,
+      degraded: Boolean(degraded || !text),
+      alreadyRecorded: false,
     });
   } catch (err) {
     next(err);
