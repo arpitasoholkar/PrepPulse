@@ -33,6 +33,9 @@ const toAiMessage = (data, feedback = null) => ({
   styleReason: data.styleReason,
   ladderStep: data.ladderStep,
   degraded: Boolean(data.degraded),
+  ladder: data.ladder || { tried: [], exhausted: false },
+  exhausted: Boolean(data.ladder?.exhausted),
+  stylePlan: data.stylePlan || [],
   memoriesUsed: data.memoriesUsed || [],
   feedback,
 });
@@ -53,6 +56,12 @@ export default function Mentor() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const [skipped, setSkipped] = useState([]);
+
+  const aiMessages = messages.filter((m) => m.role === 'assistant');
+  const lastAi = aiMessages[aiMessages.length - 1];
+
+  const busyRef = useRef(false); // blocks double clicks before React re-renders
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -79,12 +88,64 @@ export default function Mentor() {
     setSaved((prev) => [...items, ...prev]);
   }, []);
 
+  const addSkipped = useCallback((items) => {
+    if (!items || items.length === 0) return;
+    const stamp = Date.now();
+    setSkipped((prev) => [
+      ...items.map((it, i) => ({ key: `skip-${stamp}-${i}`, ...it })),
+      ...prev,
+    ]);
+  }, []);
+
   const appendMessage = (m) => setMessages((prev) => [...prev, m]);
+
+  // Shared by the feedback buttons and typed feedback ("got it", "I don't understand").
+  // `target` is the AI message the feedback is about.
+  const applyFeedbackResult = (data, target, understood) => {
+    if (data.alreadyRecorded) {
+      setToast({ text: 'Already recorded. Nothing new was saved.' });
+    }
+    if (target) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === target.id
+            ? {
+                ...m,
+                feedback: understood ? 'understood' : 'not_understood',
+                // Newest ladder carries worked/failed outcomes for every style.
+                ladder: data.ladder?.tried?.length ? data.ladder : m.ladder,
+              }
+            : m
+        )
+      );
+    }
+    if (!data.alreadyRecorded) {
+      addSaved(data.memoriesSaved, 'saved');
+      addSaved(data.memoriesUpdated, 'updated');
+    }
+    addSkipped(data.memoriesSkipped);
+
+    if (understood) {
+      if (!data.alreadyRecorded) {
+        const first = data.memoriesSaved?.[0];
+        setToast({
+          text: first ? `Saved to memory: ${first.content}` : 'Marked as understood.',
+        });
+      }
+      // Short "try a question" nudge. Never add an empty bubble.
+      if (data.reply && data.reply.trim()) appendMessage(toAiMessage(data, 'done'));
+    } else if (data.reply && data.reply.trim()) {
+      const ai = toAiMessage(data);
+      appendMessage(ai);
+      setSelectedId(ai.id);
+    }
+  };
 
   const handleSend = async (text) => {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    if (!content || loading || busyRef.current) return;
 
+    busyRef.current = true;
     setInput('');
     setError(null);
     appendMessage({ id: uid(), role: 'user', content });
@@ -92,20 +153,30 @@ export default function Mentor() {
 
     try {
       const res = await sendMessage({ sessionId, message: content });
-      const ai = toAiMessage(res.data);
-      appendMessage(ai);
-      setSelectedId(ai.id);
-      addSaved(res.data.memoriesSaved, 'saved');
+      const data = res.data;
+
+      if (data.feedbackApplied === 'understood' || data.feedbackApplied === 'not_understood') {
+        // Typed feedback: same handling as a button click, on the previous reply.
+        applyFeedbackResult(data, lastAi, data.feedbackApplied === 'understood');
+      } else {
+        const ai = toAiMessage(data);
+        appendMessage(ai);
+        setSelectedId(ai.id);
+        addSaved(data.memoriesSaved, 'saved');
+        addSkipped(data.memoriesSkipped);
+      }
     } catch (err) {
       setError(errorText(err));
     } finally {
+      busyRef.current = false;
       setLoading(false);
       inputRef.current?.focus();
     }
   };
 
   const handleFeedback = async (message, understood) => {
-    if (loading) return;
+    if (loading || busyRef.current) return;
+    busyRef.current = true;
     setError(null);
     setLoading(true);
 
@@ -115,31 +186,11 @@ export default function Mentor() {
         messageId: message.messageId,
         understood,
       });
-      const data = res.data;
-
-      setMessages((prev) =>
-        prev.map((m) => (m.id === message.id ? { ...m, feedback: understood ? 'understood' : 'not_understood' } : m))
-      );
-      addSaved(data.memoriesSaved, 'saved');
-      addSaved(data.memoriesUpdated, 'updated');
-
-      if (understood) {
-        const first = data.memoriesSaved?.[0];
-        setToast({
-          text: first ? `Saved to memory: ${first.content}` : 'Marked as understood.',
-        });
-        if (data.reply && data.reply.trim()) {
-          // Short "try a question" nudge; no feedback buttons on it.
-          appendMessage(toAiMessage(data, 'done'));
-        }
-      } else if (data.reply && data.reply.trim()) {
-        const ai = toAiMessage(data);
-        appendMessage(ai);
-        setSelectedId(ai.id);
-      }
+      applyFeedbackResult(res.data, message, understood);
     } catch (err) {
       setError(errorText(err));
     } finally {
+      busyRef.current = false;
       setLoading(false);
     }
   };
@@ -148,6 +199,7 @@ export default function Mentor() {
     setSessionId(uid());
     setMessages([]);
     setSaved([]);
+    setSkipped([]);
     setSelectedId(null);
     setError(null);
     setInput('');
@@ -164,8 +216,6 @@ export default function Mentor() {
 
   const firstName = (user?.name || '').trim().split(' ')[0] || 'there';
 
-  const aiMessages = messages.filter((m) => m.role === 'assistant');
-  const lastAi = aiMessages[aiMessages.length - 1];
   const shownAi = aiMessages.find((m) => m.id === selectedId) || lastAi;
 
   // The sidebar "+" button links here with { newSession } state.
@@ -241,6 +291,7 @@ export default function Mentor() {
                 onUnderstood={() => handleFeedback(m, true)}
                 onNotUnderstood={() => handleFeedback(m, false)}
                 onGoPractice={() => navigate('/practice')}
+                onAskLine={() => inputRef.current?.focus()}
               />
             ))}
 
@@ -291,6 +342,8 @@ export default function Mentor() {
         <MemoriesUsedPanel
           used={shownAi?.memoriesUsed || []}
           saved={saved}
+          skipped={skipped}
+          plan={shownAi?.stylePlan || []}
           loading={loading}
           replyKey={shownAi?.id || 'none'}
           hasReply={Boolean(shownAi)}

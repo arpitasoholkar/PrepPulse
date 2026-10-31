@@ -207,7 +207,13 @@ export default function Practice() {
                     <ResultCard
                       result={result}
                       onTryAgain={clearResult}
-                      onAskMentor={() => navigate('/mentor')}
+                      onAskMentor={() => {
+                        const err = result?.errorType && result.errorType !== 'none' ? result.errorType.replace(/_/g, ' ') : null;
+                        const prefill = err
+                          ? `Explain ${err} in ${question.topic}`
+                          : `Explain ${question.topic}`;
+                        navigate('/mentor', { state: { prefill, at: Date.now() } });
+                      }}
                     />
                   </div>
                 )}

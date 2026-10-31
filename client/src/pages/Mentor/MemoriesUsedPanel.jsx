@@ -1,7 +1,8 @@
 import React from 'react';
 import { Brain, Bookmark, Pencil } from 'lucide-react';
 import { Sparkle, Leaves } from '../../components/Illustrations.jsx';
-import { getTypeStyle } from '../../components/memoryStyles.js';
+import { getTypeStyle, getStyleBadge } from '../../components/memoryStyles.js';
+import PlanCard from './PlanCard.jsx';
 
 function ConfidenceBar({ value, barClass }) {
   const pct = Math.max(0, Math.min(100, Math.round((Number(value) || 0) * 100)));
@@ -24,6 +25,8 @@ function ConfidenceBar({ value, barClass }) {
 
 function MemoryCard({ memory, why, score, tag, animate }) {
   const style = getTypeStyle(memory?.type);
+  const polarity = memory?.meta?.polarity; // "worked" | "failed"
+  const barClass = polarity === 'worked' ? 'bg-emerald-400' : polarity === 'failed' ? 'bg-rose-400' : style.bar;
   return (
     <li
       className={`rounded-2xl border border-white/10 border-l-4 ${style.edge} bg-white/[0.04] p-3.5 ${
@@ -37,6 +40,27 @@ function MemoryCard({ memory, why, score, tag, animate }) {
         {memory?.topic && (
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-white/15 bg-white/5 text-slate-300">
             {memory.topic === '*' ? 'all topics' : memory.topic}
+          </span>
+        )}
+        {polarity && (
+          <span
+            className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
+              polarity === 'worked'
+                ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
+                : 'border-rose-400/40 bg-rose-400/10 text-rose-300'
+            }`}
+          >
+            {polarity === 'worked' ? '\u2713 Worked' : "\u2717 Didn't work"}
+          </span>
+        )}
+        {polarity && memory?.meta?.style && (
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${getStyleBadge(memory.meta.style).chip}`}>
+            {getStyleBadge(memory.meta.style).label}
+          </span>
+        )}
+        {memory?.meta?.tentative && (
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-300">
+            Tentative
           </span>
         )}
         {memory?.status === 'corrected' && (
@@ -56,7 +80,7 @@ function MemoryCard({ memory, why, score, tag, animate }) {
 
       <p className="text-base font-medium text-slate-100 mt-2.5 leading-snug">{memory?.content}</p>
 
-      <ConfidenceBar value={memory?.confidence} barClass={style.bar} />
+      <ConfidenceBar value={memory?.confidence} barClass={barClass} />
 
       {why && (
         <p className="text-sm text-slate-400 mt-2.5 leading-snug">
@@ -68,7 +92,7 @@ function MemoryCard({ memory, why, score, tag, animate }) {
   );
 }
 
-export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasReply, degraded }) {
+export default function MemoriesUsedPanel({ used, saved, skipped = [], plan = [], loading, replyKey, hasReply, degraded }) {
   return (
     <aside aria-label="Memories used" className="relative flex flex-col min-h-0 h-full">
       <Leaves className="pointer-events-none absolute -right-6 bottom-0 w-44 h-60 opacity-80" />
@@ -81,6 +105,8 @@ export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasR
       </div>
 
       <div className="relative flex-1 overflow-y-auto p-5 space-y-7">
+        <PlanCard key={replyKey} plan={plan} />
+
         <section aria-label="Memories used for this reply">
           {used.length > 0 ? (
             <>
@@ -142,6 +168,16 @@ export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasR
               <Pencil className="w-4 h-4 mt-0.5 shrink-0" />
               New memories from this session appear here, for example after you click "I understood".
             </p>
+          )}
+          {skipped.length > 0 && (
+            <ul className="mt-4 space-y-1" aria-label="Not saved">
+              {skipped.map((item) => (
+                <li key={item.key} className="text-xs text-slate-500 leading-snug">
+                  Not saved: {item.reason || 'skipped'}
+                  {item.text ? <span className="text-slate-600"> ({`\u201c${item.text}\u201d`})</span> : null}
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       </div>

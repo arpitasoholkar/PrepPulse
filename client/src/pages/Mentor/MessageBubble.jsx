@@ -2,6 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { CheckCircle2, ArrowRight, AlertTriangle } from 'lucide-react';
 import FeedbackButtons from './FeedbackButtons.jsx';
+import LadderRow from './LadderRow.jsx';
 import { getStyleBadge } from '../../components/memoryStyles.js';
 
 const markdownComponents = {
@@ -39,6 +40,7 @@ export default function MessageBubble({
   onUnderstood,
   onNotUnderstood,
   onGoPractice,
+  onAskLine,
 }) {
   if (message.role === 'user') {
     return (
@@ -85,15 +87,38 @@ export default function MessageBubble({
           </span>
         </div>
 
-        {message.styleReason && <p className="text-sm italic text-slate-400 mb-3">{message.styleReason}</p>}
+        {message.ladder?.tried?.length > 0 ? (
+          <LadderRow tried={message.ladder.tried} reason={message.styleReason} />
+        ) : (
+          message.styleReason && <p className="text-sm italic text-slate-400 mb-3">{message.styleReason}</p>
+        )}
 
         <div className="text-base text-slate-200">
           <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
         </div>
 
-        {showFeedback && (
+        {showFeedback && !message.exhausted && (
           <div onClick={(e) => e.stopPropagation()}>
             <FeedbackButtons disabled={busy} onUnderstood={onUnderstood} onNotUnderstood={onNotUnderstood} />
+          </div>
+        )}
+
+        {message.exhausted && (
+          <div className="flex flex-wrap gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={onAskLine}
+              className="px-4 py-2 rounded-full text-sm font-semibold border border-violet-400/40 bg-violet-400/15 text-violet-100 hover:bg-violet-400/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              Ask about the exact line
+            </button>
+            <button
+              type="button"
+              onClick={onGoPractice}
+              className="px-4 py-2 rounded-full text-sm font-semibold border border-white/20 bg-white/5 text-slate-200 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              Try a practice question
+            </button>
           </div>
         )}
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, RotateCcw, UserRound } from 'lucide-react';
+import { Eraser, LogOut, RotateCcw, UserRound } from 'lucide-react';
 import { useUser } from '../context/UserContext.jsx';
-import { resetDemo } from '../api/dashboard.js';
+import { resetAccount } from '../api/demo.js';
 
 export function Avatar({ name, size = 'w-12 h-12 text-base' }) {
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -34,11 +34,15 @@ export default function UserMenu({ compact = false }) {
     };
   }, [open]);
 
-  const handleReset = async () => {
+  const handleReset = async (mode) => {
     setOpen(false);
-    if (window.confirm('Reset this account to the seeded demo data?')) {
+    const question =
+      mode === 'blank'
+        ? 'Wipe this account and start blank? All memories, activity and badges are deleted.'
+        : 'Reset this account to the seeded demo data?';
+    if (window.confirm(question)) {
       try {
-        await resetDemo();
+        await resetAccount(mode);
         window.location.reload();
       } catch (err) {
         alert('Could not reset the demo. Check that the server is running.');
@@ -97,11 +101,20 @@ export default function UserMenu({ compact = false }) {
           <button
             type="button"
             role="menuitem"
-            onClick={handleReset}
+            onClick={() => handleReset('seed')}
             className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
           >
             <RotateCcw className="w-4 h-4 text-rose-300" />
-            Reset demo data
+            Reset to demo data
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => handleReset('blank')}
+            className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+          >
+            <Eraser className="w-4 h-4 text-amber-300" />
+            Start blank account
           </button>
           <button
             type="button"

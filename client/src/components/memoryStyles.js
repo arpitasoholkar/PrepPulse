@@ -51,6 +51,7 @@ export const getTypeStyle = (type) => MEMORY_TYPE_STYLES[type] || FALLBACK_TYPE_
 export const STYLE_BADGES = {
   theory: { label: 'Theory', chip: 'bg-white/10 text-slate-200 border-white/20' },
   simple: { label: 'Simple', chip: 'bg-sky-400/10 text-sky-300 border-sky-400/30' },
+  example: { label: 'Worked example', chip: 'bg-rose-400/10 text-rose-300 border-rose-400/30' },
   analogy: { label: 'Analogy', chip: 'bg-amber-400/10 text-amber-300 border-amber-400/30' },
   visual: { label: 'Visual', chip: 'bg-violet-400/10 text-violet-300 border-violet-400/30' },
   dry_run: { label: 'Dry run', chip: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30' },

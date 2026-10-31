@@ -36,6 +36,7 @@ export const MEMORY_SOURCE = [
 export const EXPLANATION_STYLES = [
   "theory",
   "simple",
+  "example",
   "analogy",
   "visual",
   "dry_run"
