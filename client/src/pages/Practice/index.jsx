@@ -207,6 +207,7 @@ export default function Practice() {
                     <ResultCard
                       result={result}
                       onTryAgain={clearResult}
+                      onContinueLearning={() => navigate('/mentor', { state: { continueLearning: true, at: Date.now() } })}
                       onAskMentor={() => {
                         const err = result?.errorType && result.errorType !== 'none' ? result.errorType.replace(/_/g, ' ') : null;
                         const prefill = err

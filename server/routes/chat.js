@@ -4,6 +4,7 @@
 
 import express from 'express';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { authenticate } from '../middleware/auth.js';
 import ChatSession from '../models/ChatSession.js';
 import { TOPICS } from '../memory/deps.js';
@@ -20,6 +21,7 @@ import { recordStyleOutcome, saveConceptUnderstood } from '../memory/lifecycle.j
 import { shouldSave, isSmallTalk } from '../memory/gate.js';
 import { extractFactsFromChat } from '../memory/extract.js';
 import { recordEvent } from '../gamification/service.js';
+import { getCurriculum, markTopicLearned, markTopicTeaching, topicLabel } from '../memory/curriculum.js';
 
 // Try loading Person A's intent detector if present, otherwise fallback
 let detectFeedbackIntent = null;
@@ -130,6 +132,69 @@ const usedForResponse = (used) =>
     why: x.why,
     score: x.score,
   }));
+
+/**
+ * Teaches the next unlearned topic as a new assistant message in this session.
+ * Returns null only if every topic is already learned (a closing message is saved then).
+ */
+async function teachNextTopic({ session, userId, justLearned = null }) {
+  const { next } = await getCurriculum(userId);
+
+  if (!next) {
+    const id = newMessageId();
+    const content = `\u{1F389} You've covered all ${TOPICS.length} topics. Pick any topic to revise, or try practice questions to lock it in.`;
+    session.messages.push({ id, role: 'assistant', content, topic: justLearned, style: null, degraded: false });
+    await session.save();
+    return { messageId: id, reply: content, topic: justLearned, explanationStyle: null, completed: true, memoriesUsed: [], stylePlan: [], ladder: session.ladder, degraded: false };
+  }
+
+  const { ladder, style, reason, stylePlan } = await startLadder({ userId, topic: next, existingTried: [] });
+  const used = await retrieveMemories({ userId, topic: next, limit: 5 });
+  const avoidStyles = stylePlan.filter((s) => s.status === 'avoid').map((s) => s.style);
+
+  const { reply, degraded } = await makeReply({
+    style: style || 'theory',
+    topic: next,
+    used,
+    question: `Teach me ${topicLabel(next)} from the beginning.`,
+    avoidStyles,
+    history: [],
+  });
+
+  const intro = justLearned
+    ? `\u2705 **${topicLabel(justLearned)}** is marked as learned. Next topic: **${topicLabel(next)}**.\n\n`
+    : `Let's continue with **${topicLabel(next)}**.\n\n`;
+
+  const id = newMessageId();
+  session.messages.push({
+    id,
+    role: 'assistant',
+    content: intro + reply,
+    topic: next,
+    style: style || 'theory',
+    styleReason: reason,
+    stylePlan,
+    memoriesUsed: usedForResponse(used),
+    degraded,
+  });
+  session.set('ladder', ladder);
+  await session.save();
+
+  if (!degraded) await markTopicTeaching({ userId, topic: next });
+
+  return {
+    messageId: id,
+    reply: intro + reply,
+    topic: next,
+    explanationStyle: style || 'theory',
+    styleReason: reason,
+    ladderStep: ladder.step,
+    ladder,
+    stylePlan,
+    memoriesUsed: usedForResponse(used),
+    degraded,
+  };
+}
 
 /**
  * Shared helper for applying feedback (both button click & typed text)
@@ -249,14 +314,26 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       tried: (session.ladder?.tried || []).map((t) => t.style),
     });
 
+    // Topic done: remember it, then move on to the next topic.
+    const finishedLadder = session.ladder;
+    let topicCompleted = null;
+    let next = null;
+    if (targetTopic && targetTopic !== '*') {
+      await markTopicLearned({ userId, topic: targetTopic });
+      topicCompleted = targetTopic;
+      next = await teachNextTopic({ session, userId, justLearned: targetTopic });
+    }
+
     return {
+      topicCompleted,
+      next,
       messageId,
       reply: '',
       topic: targetTopic,
       explanationStyle: targetStyle,
-      ladderStep: session.ladder?.step || 0,
+      ladderStep: finishedLadder?.step || 0,
       styleReason: `Saved: ${targetStyle} works for you on ${targetTopic}`,
-      ladder: session.ladder,
+      ladder: finishedLadder,
       stylePlan: ranking.stylePlan,
       memoriesUsed: [],
       memoriesSaved: [...styleOutcome.saved, ...conceptSaved],
@@ -352,6 +429,9 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       content: reply,
       topic: targetTopic,
       style: nextStyle,
+      styleReason: reason,
+      stylePlan,
+      memoriesUsed: usedForResponse(used),
       degraded,
     });
 
@@ -465,6 +545,8 @@ router.post('/', async (req, res, next) => {
 
     const messageId = newMessageId();
 
+    if (!session.title) session.title = String(message).trim().slice(0, 60);
+
     session.messages.push({
       id: 'u_' + messageId,
       role: 'user',
@@ -478,6 +560,9 @@ router.post('/', async (req, res, next) => {
       content: reply,
       topic,
       style: style || 'theory',
+      styleReason: reason,
+      stylePlan,
+      memoriesUsed: usedForResponse(used),
       degraded,
     });
 
@@ -504,6 +589,8 @@ router.post('/', async (req, res, next) => {
       }
     }
 
+    if (!degraded && topic) await markTopicTeaching({ userId: req.userId, topic });
+
     const gamification = await recordEvent(req.userId, req.tzOffset, { chats: 1 });
 
     return res.json({
@@ -525,6 +612,94 @@ router.post('/', async (req, res, next) => {
       newBadges: gamification.newBadges,
       streak: gamification.streak,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/chat/sessions : chat history list ----------
+router.get('/sessions', async (req, res, next) => {
+  try {
+    const rows = await ChatSession.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(req.userId) } },
+      { $sort: { updatedAt: -1 } },
+      { $limit: 50 },
+      {
+        $project: {
+          _id: 0,
+          sessionId: 1,
+          title: 1,
+          updatedAt: 1,
+          topic: '$ladder.topic',
+          messageCount: { $size: '$messages' },
+          firstMessage: { $arrayElemAt: ['$messages.content', 0] },
+        },
+      },
+    ]);
+    const sessions = rows
+      .filter((r) => r.messageCount > 0)
+      .map((r) => ({
+        sessionId: r.sessionId,
+        title: r.title || String(r.firstMessage || 'Chat').slice(0, 60),
+        topic: r.topic || null,
+        messageCount: r.messageCount,
+        updatedAt: r.updatedAt,
+      }));
+    res.json({ sessions });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/chat/sessions/:sessionId : reopen one chat ----------
+router.get('/sessions/:sessionId', async (req, res, next) => {
+  try {
+    const session = await ChatSession.findOne({ userId: req.userId, sessionId: req.params.sessionId }).lean();
+    if (!session) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Chat session not found' } });
+    }
+    res.json({
+      sessionId: session.sessionId,
+      title: session.title || '',
+      messages: session.messages || [],
+      ladder: session.ladder || null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- DELETE /api/chat/sessions/:sessionId ----------
+router.delete('/sessions/:sessionId', async (req, res, next) => {
+  try {
+    await ChatSession.deleteOne({ userId: req.userId, sessionId: req.params.sessionId });
+    res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/chat/curriculum : learning path + next topic ----------
+router.get('/curriculum', async (req, res, next) => {
+  try {
+    res.json(await getCurriculum(req.userId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- POST /api/chat/next : teach the next unlearned topic in this chat ----------
+router.post('/next', async (req, res, next) => {
+  try {
+    const { sessionId } = req.body || {};
+    if (!sessionId) {
+      const e = badRequest('sessionId is required');
+      return res.status(e.status).json({ error: e.error });
+    }
+    const session = await getOrCreateSession(req.userId, sessionId);
+    if (!session.title) session.title = 'Learning path';
+    const result = await teachNextTopic({ session, userId: req.userId });
+    res.json({ next: result, curriculum: await getCurriculum(req.userId) });
   } catch (err) {
     next(err);
   }

@@ -53,7 +53,7 @@ function MemoryRow({ memory, tag }) {
   );
 }
 
-export default function ResultCard({ result, onTryAgain, onAskMentor }) {
+export default function ResultCard({ result, onTryAgain, onAskMentor, onContinueLearning }) {
   const theme = RESULT_THEME[result.result] || RESULT_THEME.error;
   const Icon = theme.icon;
   const total = result.testsTotal || 0;
@@ -189,6 +189,15 @@ export default function ResultCard({ result, onTryAgain, onAskMentor }) {
           <MessageSquareText className="w-3.5 h-3.5" />
           Ask the mentor
         </button>
+        {onContinueLearning && (
+          <button
+            type="button"
+            onClick={onContinueLearning}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-bold border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 transition"
+          >
+            Back to learning
+          </button>
+        )}
       </div>
     </section>
   );

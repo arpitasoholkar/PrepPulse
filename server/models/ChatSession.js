@@ -10,6 +10,8 @@ const messageSchema = new mongoose.Schema({
   explanationStyle: { type: String, enum: EXPLANATION_STYLES, default: null },
   memoriesUsed: [{ type: Object }],
   degraded: { type: Boolean, default: false },
+  styleReason: { type: String, default: null },
+  stylePlan: [{ type: Object }],
   feedback: { type: String, enum: ['understood', 'not_understood', null], default: null },
   timestamp: { type: Date, default: Date.now }
 }, { _id: false });
@@ -17,6 +19,7 @@ const messageSchema = new mongoose.Schema({
 const chatSessionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   sessionId: { type: String, required: true },
+  title: { type: String, default: '' },
   messages: [messageSchema],
   ladder: {
     topic: { type: String, default: null },
