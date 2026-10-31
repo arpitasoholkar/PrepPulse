@@ -90,6 +90,6 @@ memorySchema.index({ userId: 1, type: 1 });
 
 // TTL index to automatically purge expired memories
 memorySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
+memorySchema.index({ userId: 1, type: 1, topic: 1, 'meta.style': 1 });
 export const Memory = mongoose.model('Memory', memorySchema, 'student_memories');
 export default Memory;
