@@ -12,6 +12,10 @@ export const connectDB = async (uri = process.env.MONGODB_URI) => {
   }
 
   try {
+    const parsedUri = new URL(uri);
+
+console.log("MongoDB hostname:", parsedUri.hostname);
+console.log("Environment variable loaded:", !!process.env.MONGODB_URI);
     const conn = await mongoose.connect(uri);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     return conn;
