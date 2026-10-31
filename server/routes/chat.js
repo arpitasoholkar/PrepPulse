@@ -96,7 +96,7 @@ async function resolveTopic(message, session) {
   return (session.ladder && session.ladder.topic) || null;
 }
 
-async function makeReply({ style, topic, used, question, previousReply, avoidStyles = [] }) {
+async function makeReply({ style, topic, used, question, previousReply, avoidStyles = [], history = [] }) {
   const { text, degraded } = await generateText({
     system: buildMentorSystem({
       style,
@@ -107,6 +107,7 @@ async function makeReply({ style, topic, used, question, previousReply, avoidSty
     prompt: buildMentorPrompt({
       question,
       previousReply,
+      history,
     }),
   });
 
@@ -340,6 +341,7 @@ async function applyFeedback({ session, aiMessage, understood, userId, reqTzOffs
       question,
       previousReply: aiMessage.content,
       avoidStyles,
+      history: session.messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
     });
 
     const newId = newMessageId();
@@ -449,12 +451,16 @@ router.post('/', async (req, res, next) => {
 
     const avoidStyles = stylePlan.filter((s) => s.status === 'avoid').map((s) => s.style);
 
+    // Last few messages, so the mentor can answer in context
+    const history = session.messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+
     const { reply, degraded } = await makeReply({
       style: style || 'theory',
       topic,
       used,
       question: message,
       avoidStyles,
+      history,
     });
 
     const messageId = newMessageId();
