@@ -18,6 +18,7 @@ import { startLadder, nextStep } from '../memory/ladder.js';
 import { rankStyles, STYLE_HUMAN_NAMES } from '../memory/styles.js';
 import { recordStyleOutcome, saveConceptUnderstood } from '../memory/lifecycle.js';
 import { shouldSave, isSmallTalk } from '../memory/gate.js';
+import { extractFactsFromChat } from '../memory/extract.js';
 import { recordEvent } from '../gamification/service.js';
 
 // Try loading Person A's intent detector if present, otherwise fallback
@@ -477,6 +478,26 @@ router.post('/', async (req, res, next) => {
     session.set('ladder', ladder);
     await session.save();
 
+    // P1: Extract durable facts from free text if not small talk and not degraded
+    let extractedSaved = [];
+    let extractedUpdated = [];
+    if (!isSmallTalkMessage && !degraded) {
+      try {
+        const extraction = await extractFactsFromChat({
+          userId: req.userId,
+          message,
+          messageId,
+        });
+        extractedSaved = extraction.saved || [];
+        extractedUpdated = extraction.updated || [];
+        if (extraction.skipped && extraction.skipped.length > 0) {
+          memoriesSkipped.push(...extraction.skipped);
+        }
+      } catch (err) {
+        // Silently skip LLM extraction failure
+      }
+    }
+
     const gamification = await recordEvent(req.userId, req.tzOffset, { chats: 1 });
 
     return res.json({
@@ -491,8 +512,8 @@ router.post('/', async (req, res, next) => {
       feedbackApplied: null,
       alreadyRecorded: false,
       memoriesUsed: usedForResponse(used),
-      memoriesSaved: [],
-      memoriesUpdated: [],
+      memoriesSaved: extractedSaved,
+      memoriesUpdated: extractedUpdated,
       memoriesSkipped,
       degraded,
       newBadges: gamification.newBadges,
