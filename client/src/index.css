@@ -2,11 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ink: #1f1f38;
+  --ink-soft: #6b6b85;
+  --lime: #d9f26e;
+  --lav: #c4a8f7;
+  --paper: #f8f7f3;
+}
+
+/* Compact density on desktop: Tailwind sizes are rem based, so lowering the root
+   size shrinks the whole UI (text, padding, gaps, cards) proportionally. */
+@media (min-width: 1024px) {
+  html { font-size: 13px; }
+}
+@media (min-width: 1024px) and (min-height: 900px) {
+  html { font-size: 14px; }
+}
+
 body {
   margin: 0;
-  background-color: #070617;
-  color: #f8fafc;
-  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--lav);
+  color: var(--ink);
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -21,68 +38,68 @@ dialog::backdrop {
 }
 
 @layer components {
-  /* Deep navy page with a violet glow from the top and a teal wash on the left */
+  /* Lavender backdrop behind the big rounded app shell */
   .app-bg {
-    background-color: #070617;
+    background-color: var(--lav);
     background-image:
-      radial-gradient(60rem 36rem at 38% -8%, rgba(124, 92, 255, 0.42), transparent 62%),
-      radial-gradient(34rem 28rem at -4% 62%, rgba(45, 212, 191, 0.14), transparent 62%),
-      radial-gradient(44rem 28rem at 104% 104%, rgba(124, 92, 255, 0.16), transparent 62%);
+      radial-gradient(50rem 30rem at 15% 0%, rgba(255, 255, 255, 0.28), transparent 60%),
+      radial-gradient(40rem 30rem at 100% 100%, rgba(124, 92, 255, 0.25), transparent 60%);
     background-attachment: fixed;
   }
 
-  /* Dark glass card used for every panel */
+  /* The off-white rounded surface that holds sidebar and content */
+  .app-shell {
+    background: var(--paper);
+    box-shadow: 0 40px 80px -30px rgba(70, 40, 140, 0.45);
+  }
+
+  /* White card used for every panel */
   .glass {
-    background: rgba(22, 20, 54, 0.62);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: #fff;
+    border: 1px solid rgba(31, 31, 56, 0.05);
+    box-shadow: 0 1px 2px rgba(31, 31, 56, 0.04), 0 8px 24px -14px rgba(31, 31, 56, 0.16);
   }
 
   .glass-strong {
-    background: rgba(18, 16, 46, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: #fff;
+    border: 1px solid rgba(31, 31, 56, 0.08);
+    box-shadow: 0 18px 40px -12px rgba(31, 31, 56, 0.28);
   }
 
-  /* Teal to violet, the brand gradient */
+  /* Lime call-to-action */
   .btn-gradient {
-    background-image: linear-gradient(90deg, #14b8a6 0%, #7c5cff 100%);
+    background-color: var(--lime);
   }
   .btn-gradient:hover {
-    filter: brightness(1.1);
+    filter: brightness(0.96);
   }
 
   .brand-gradient-text {
-    background-image: linear-gradient(90deg, #5eead4, #a78bfa);
+    background-image: linear-gradient(90deg, #7c5cff, #14b8a6);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
-  /* Round icon bubble used by nav, login points and buttons */
+  /* Round icon bubble used by buttons and login points */
   .bubble {
     display: grid;
     place-items: center;
     flex-shrink: 0;
     border-radius: 9999px;
-    color: #cbd5e1;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--ink);
+    background: rgba(31, 31, 56, 0.05);
+    border: 1px solid rgba(31, 31, 56, 0.08);
     transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   }
   .bubble:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
+    background: rgba(31, 31, 56, 0.1);
   }
-  /* Active nav link */
   .bubble-active,
   .bubble-active:hover {
-    color: #fff;
-    background-image: linear-gradient(135deg, #7c5cff 0%, #14b8a6 100%);
-    border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 0 0 18px rgba(124, 92, 255, 0.55);
+    color: var(--ink);
+    background: var(--lime);
+    border-color: transparent;
   }
 
   .btn-pill {
@@ -90,20 +107,81 @@ dialog::backdrop {
     text-align: center;
     border-radius: 9999px;
     font-weight: 800;
-    color: #fff;
-    background-image: linear-gradient(90deg, #14b8a6 0%, #7c5cff 100%);
+    color: var(--ink);
+    background-color: var(--lime);
     transition: filter 0.15s;
   }
   .btn-pill:hover {
-    filter: brightness(1.1);
+    filter: brightness(0.96);
   }
 
   .orb {
     border-radius: 9999px;
-    background: radial-gradient(circle at 30% 30%, #e3d8ff, #7c5cff 55%, #14b8a6);
-    box-shadow: 0 0 60px rgba(124, 92, 255, 0.5);
+    background: radial-gradient(circle at 30% 30%, #fff, #c4a8f7 55%, #7c5cff);
+    box-shadow: 0 18px 40px rgba(124, 92, 255, 0.35);
+  }
+
+  /* Dark sidebar */
+  .side-link {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    border-radius: 9999px;
+    padding: 0.8rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e6e6f2;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .side-link:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .side-link-active,
+  .side-link-active:hover {
+    background: var(--lime);
+    color: var(--ink);
+    font-weight: 700;
   }
 }
+
+/*
+ * Pages written for the old dark theme (Mentor, Practice, Vault, Login ...)
+ * keep their markup. Inside .skin-light the few hard-coded white and purple
+ * utilities are turned into their light equivalents. Palette shades such as
+ * slate-300 or rose-950 are handled by tailwind.config.js.
+ */
+.skin-light .text-white { color: var(--ink); }
+.skin-light .hover\:text-white:hover { color: var(--ink); }
+.skin-light [class*="bg-indigo-"].text-white,
+.skin-light [class*="bg-rose-"].text-white,
+.skin-light [class*="bg-gradient"].text-white,
+.skin-light [class*="bg-indigo-"][class*="text-indigo-100"] { color: #fff; }
+.skin-light .btn-pill { color: var(--ink); }
+
+.skin-light .bg-white\/5,
+.skin-light .bg-white\/\[0\.03\],
+.skin-light .bg-white\/\[0\.04\] { background-color: rgba(31, 31, 56, 0.04); }
+.skin-light .bg-white\/10 { background-color: rgba(31, 31, 56, 0.07); }
+.skin-light .bg-white\/25 { background-color: rgba(31, 31, 56, 0.14); }
+.skin-light .hover\:bg-white\/10:hover,
+.skin-light .hover\:bg-white\/\[0\.07\]:hover { background-color: rgba(31, 31, 56, 0.08); }
+
+.skin-light .border-white\/10 { border-color: rgba(31, 31, 56, 0.09); }
+.skin-light .border-white\/15 { border-color: rgba(31, 31, 56, 0.12); }
+.skin-light .border-white\/20 { border-color: rgba(31, 31, 56, 0.16); }
+
+/* Dark purple inputs and chat boxes become white fields */
+.skin-light [class*="bg-[#3b1d6e]"],
+.skin-light [class*="bg-[#4d2784]"] {
+  background-color: #fff;
+  color: var(--ink);
+  border-color: rgba(31, 31, 56, 0.14);
+}
+.skin-light input::placeholder,
+.skin-light textarea::placeholder { color: #9a9ab0; }
+.skin-light .bg-black\/30 { background-color: #f4f3f9; }
+.skin-light .shadow-black\/30,
+.skin-light .shadow-black\/20 { --tw-shadow-color: rgba(31, 31, 56, 0.18); }
 
 /* Memories panel: a card that just arrived flashes once so the change is visible */
 @keyframes memory-flash {

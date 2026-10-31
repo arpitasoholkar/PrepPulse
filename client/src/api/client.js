@@ -47,6 +47,8 @@ export function subscribeSlowRequests(fn) {
 
 client.interceptors.request.use((config) => {
   start();
+  // Lets the server work out "today" in the user's own time zone
+  config.headers['x-tz-offset'] = String(new Date().getTimezoneOffset());
   const user = localStorage.getItem('user');
   if (user) {
     try {
@@ -67,6 +69,11 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (res) => {
     finish();
+    // Practice and chat replies can carry newly earned badges and the streak.
+    const url = res?.config?.url || '';
+    if (/\/practice\/submit|\/chat$/.test(url) || res?.data?.newBadges?.length) {
+      window.dispatchEvent(new CustomEvent('activity:changed', { detail: res.data || {} }));
+    }
     return res;
   },
   (err) => {

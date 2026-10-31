@@ -18,6 +18,19 @@ const userSchema = new mongoose.Schema({
     default: 'SDE',
     trim: true
   },
+  // Badges earned through activity (see gamification/badges.js)
+  badges: {
+    type: [new mongoose.Schema({
+      key: { type: String, required: true },
+      earnedAt: { type: Date, default: Date.now }
+    }, { _id: false })],
+    default: []
+  },
+  // Best streak ever reached, kept so it survives a broken streak
+  longestStreak: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

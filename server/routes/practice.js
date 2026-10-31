@@ -13,13 +13,15 @@ import { JUDGE_SYSTEM, JUDGE_SCHEMA, buildJudgePrompt } from '../ai/prompts/judg
 import * as lifecycle from '../memory/lifecycle.js';
 import { updateMastery } from '../memory/mastery.js';
 import { getPrereqs } from '../memory/retrieve.js';
+import { authenticate } from '../middleware/auth.js';
+import { recordEvent } from '../gamification/service.js';
 
 const questions = JSON.parse(
   fs.readFileSync(new URL('../data/questions.json', import.meta.url), 'utf-8')
 );
 
 // ---------- GET /api/practice/questions ----------
-router.get('/practice/questions', async (req, res, next) => {
+router.get('/practice/questions', authenticate, async (req, res, next) => {
   try {
     const problems = await Memory.find({
       userId: req.userId,
@@ -83,7 +85,7 @@ function normaliseVerdict(raw, total) {
 }
 
 // ---------- POST /api/practice/submit ----------
-router.post('/practice/submit', async (req, res, next) => {
+router.post('/practice/submit', authenticate, async (req, res, next) => {
   try {
     const { questionId, code } = req.body || {};
     const question = questions.find((q) => q.id === questionId);
@@ -143,6 +145,12 @@ router.post('/practice/submit', async (req, res, next) => {
       difficulty: question.difficulty,
     });
 
+    // 3b. Streak, hours and badges (never throws)
+    const gamification = await recordEvent(req.userId, req.tzOffset, {
+      attempts: 1,
+      passes: verdict.result === 'pass' ? 1 : 0,
+    });
+
     // 4. Memories
     let memoriesSaved = [];
     let memoriesUpdated = [];
@@ -191,6 +199,8 @@ router.post('/practice/submit', async (req, res, next) => {
       memoriesSaved,
       memoriesUpdated,
       mastery,
+      newBadges: gamification.newBadges,
+      streak: gamification.streak,
       degraded: false,
     });
   } catch (err) {

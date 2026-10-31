@@ -15,6 +15,8 @@ import { buildMentorSystem, buildMentorPrompt, fallbackReply } from '../ai/promp
 import { retrieveMemories, detectTopic } from '../memory/retrieve.js';
 import { startLadder, nextStep } from '../memory/ladder.js';
 import { saveUnderstood } from '../memory/extract.js';
+import { authenticate } from '../middleware/auth.js';
+import { recordEvent } from '../gamification/service.js';
 
 const badRequest = (message) => ({ status: 400, error: { code: 'BAD_REQUEST', message } });
 
@@ -63,7 +65,7 @@ const usedForResponse = (used) =>
   used.map((x) => ({ memory: x.memory, why: x.why, score: x.score }));
 
 // ---------- POST /api/chat ----------
-router.post('/chat', async (req, res, next) => {
+router.post('/chat', authenticate, async (req, res, next) => {
   try {
     const { sessionId, message } = req.body || {};
     if (!sessionId || !message || !String(message).trim()) {
@@ -85,6 +87,9 @@ router.post('/chat', async (req, res, next) => {
     session.set('ladder', ladder);
     await session.save();
 
+    // Streak, hours and badges (never throws)
+    const gamification = await recordEvent(req.userId, req.tzOffset, { chats: 1 });
+
     res.json({
       messageId,
       reply,
@@ -95,6 +100,8 @@ router.post('/chat', async (req, res, next) => {
       memoriesUsed: usedForResponse(used),
       memoriesSaved: [],
       degraded,
+      newBadges: gamification.newBadges,
+      streak: gamification.streak,
     });
   } catch (err) {
     next(err);
@@ -102,7 +109,7 @@ router.post('/chat', async (req, res, next) => {
 });
 
 // ---------- POST /api/chat/feedback ----------
-router.post('/chat/feedback', async (req, res, next) => {
+router.post('/chat/feedback', authenticate, async (req, res, next) => {
   try {
     const { sessionId, messageId, understood } = req.body || {};
     if (!sessionId || !messageId || typeof understood !== 'boolean') {

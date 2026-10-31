@@ -295,9 +295,6 @@ export default function Vault() {
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                   Memory Vault
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800">
-                    Person B
-                  </span>
                 </h1>
                 <p className="text-sm text-slate-400 mt-0.5">
                   AI-extracted strengths, weaknesses, mistakes, and learning preferences scoped to your profile.
@@ -332,7 +329,7 @@ export default function Vault() {
             >
               <span>Active</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                selectedStatus === 'active' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-400'
+                selectedStatus === 'active' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {counts.active}
               </span>
@@ -348,7 +345,7 @@ export default function Vault() {
             >
               <span>Corrected</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                selectedStatus === 'corrected' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-400'
+                selectedStatus === 'corrected' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {counts.corrected}
               </span>
@@ -364,7 +361,7 @@ export default function Vault() {
             >
               <span>Superseded</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                selectedStatus === 'superseded' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-400'
+                selectedStatus === 'superseded' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {counts.superseded}
               </span>

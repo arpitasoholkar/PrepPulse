@@ -5,6 +5,7 @@ import Memory from '../models/Memory.js';
 import TopicMastery from '../models/TopicMastery.js';
 import CodingAttempt from '../models/CodingAttempt.js';
 import ChatSession from '../models/ChatSession.js';
+import Activity from '../models/Activity.js';
 
 const router = Router();
 router.use(authenticate);
@@ -23,7 +24,8 @@ router.post('/reset', async (req, res, next) => {
       Memory.deleteMany({ userId }),
       TopicMastery.deleteMany({ userId }),
       CodingAttempt.deleteMany({ userId }),
-      ChatSession.deleteMany({ userId })
+      ChatSession.deleteMany({ userId }),
+      Activity.deleteMany({ userId })
     ]);
 
     // Restore the baseline demo data via the seed function

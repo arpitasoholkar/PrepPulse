@@ -169,9 +169,17 @@ export default function Mentor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state?.newSession]);
 
+  // The header search box links here with { prefill } state.
+  useEffect(() => {
+    if (location.state?.prefill) {
+      setInput(location.state.prefill);
+      inputRef.current?.focus();
+    }
+  }, [location.state?.prefill, location.state?.at]);
+
   return (
     <Layout>
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 lg:gap-5 lg:h-[calc(100vh-9.5rem)] lg:overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 lg:gap-5 lg:h-[calc(100vh-12.5rem)] lg:overflow-hidden">
         {/* Chat column */}
         <section className="glass rounded-[32px] flex flex-col min-h-[75vh] lg:min-h-0 min-w-0 overflow-hidden">
           <header className="flex items-center gap-3 px-6 py-4 border-b border-white/10">

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, RotateCcw } from 'lucide-react';
+import { LogOut, RotateCcw, UserRound } from 'lucide-react';
 import { useUser } from '../context/UserContext.jsx';
 import { resetDemo } from '../api/dashboard.js';
 
 export function Avatar({ name, size = 'w-12 h-12 text-base' }) {
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
   return (
-    <span className={`grid place-items-center shrink-0 rounded-full bg-[#e3d8ff] font-extrabold text-[#3a1f73] ${size}`}>
+    <span className={`grid place-items-center shrink-0 rounded-full bg-gradient-to-br from-[#c4a8f7] to-[#7c5cff] font-extrabold text-white ${size}`}>
       {initial}
     </span>
   );
@@ -85,6 +85,15 @@ export default function UserMenu({ compact = false }) {
             <p className="text-sm font-bold text-white truncate">{user.name || 'Student'}</p>
             <p className="text-xs text-slate-400 truncate">{user.email}</p>
           </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); navigate('/profile'); }}
+            className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/10"
+          >
+            <UserRound className="w-4 h-4 text-violet-400" />
+            View profile
+          </button>
           <button
             type="button"
             role="menuitem"

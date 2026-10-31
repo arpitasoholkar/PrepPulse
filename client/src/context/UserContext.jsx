@@ -6,7 +6,7 @@ const UserContext = createContext(null);
 
 // Every path App.jsx defines. Anything else renders the 404 page.
 // App.jsx is frozen, so the catch-all lives here (UserProvider wraps the router).
-const KNOWN_PATHS = ['/', '/login', '/mentor', '/practice', '/vault', '/dashboard'];
+const KNOWN_PATHS = ['/', '/login', '/mentor', '/practice', '/vault', '/dashboard', '/profile'];
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(() => {

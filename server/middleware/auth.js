@@ -40,6 +40,9 @@ export const authenticate = async (req, res, next) => {
 
     req.user = user;
     req.userId = user._id.toString();
+    // Browser time zone (Date#getTimezoneOffset, minutes) so "today" matches the user's day
+    const tz = parseInt(req.headers['x-tz-offset'], 10);
+    req.tzOffset = Number.isFinite(tz) ? Math.max(-840, Math.min(840, tz)) : 0;
     next();
   } catch (error) {
     next(error);

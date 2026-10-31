@@ -7,6 +7,9 @@ import Memory from '../models/Memory.js';
 import TopicMastery from '../models/TopicMastery.js';
 import CodingAttempt from '../models/CodingAttempt.js';
 import ChatSession from '../models/ChatSession.js';
+import Activity from '../models/Activity.js';
+import { dayKey, addDays } from '../gamification/streak.js';
+import { evaluateBadges } from '../gamification/service.js';
 import { TOPICS } from '../constants.js';
 import { connectDB } from '../db.js';
 
@@ -25,8 +28,10 @@ export async function seedUser(userId) {
     Memory.deleteMany({ userId }),
     TopicMastery.deleteMany({ userId }),
     CodingAttempt.deleteMany({ userId }),
-    ChatSession.deleteMany({ userId })
+    ChatSession.deleteMany({ userId }),
+    Activity.deleteMany({ userId })
   ]);
+  await User.updateOne({ _id: userId }, { $set: { badges: [], longestStreak: 0 } });
 
   // 1. Seed Topic Mastery for all 10 canonical topics
   const masteryEntries = TOPICS.map(topic => {
@@ -323,6 +328,29 @@ export async function seedUser(userId) {
   ];
 
   await CodingAttempt.insertMany(seededAttempts);
+
+  // 4. Seed a week of activity so the calendar, hours chart and streak look alive.
+  // Days are UTC based; the app re-evaluates against the real local day on the next request.
+  const todayKey = dayKey(0);
+  const pattern = [
+    { ago: 8, min: 0,  attempts: 0, passes: 0, chats: 0 }, // a gap, so the streak starts after it
+    { ago: 6, min: 35, attempts: 1, passes: 1, chats: 2 },
+    { ago: 5, min: 50, attempts: 2, passes: 1, chats: 1 },
+    { ago: 4, min: 20, attempts: 1, passes: 0, chats: 3 },
+    { ago: 3, min: 75, attempts: 2, passes: 2, chats: 1 },
+    { ago: 2, min: 40, attempts: 1, passes: 1, chats: 2 },
+    { ago: 1, min: 55, attempts: 2, passes: 1, chats: 1 },
+    { ago: 0, min: 12, attempts: 1, passes: 0, chats: 1 }
+  ].filter(p => p.min > 0);
+  await Activity.insertMany(pattern.map(p => ({
+    userId,
+    day: addDays(todayKey, -p.ago),
+    seconds: p.min * 60,
+    attempts: p.attempts,
+    passes: p.passes,
+    chats: p.chats
+  })));
+  await evaluateBadges(userId, todayKey);
 
   return {
     ok: true,

@@ -33,7 +33,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-tz-offset']
 }));
 
 app.use(express.json());
@@ -45,7 +45,9 @@ const routeFiles = fs.readdirSync(routesPath).filter(file => file.endsWith('.js'
 for (const file of routeFiles) {
   const routeModule = await import(`./routes/${file}`);
   const routeName = file.replace('.js', '');
-  app.use(`/api/${routeName}`, routeModule.default);
+  // chat.js and practice.js define full paths (/chat, /practice/questions), so they mount at /api
+  const mountPath = ['chat', 'practice'].includes(routeName) ? '/api' : `/api/${routeName}`;
+  app.use(mountPath, routeModule.default);
   // Also register root health ping or specific mappings if needed
   if (routeName === 'health') {
     app.use('/api', routeModule.default);
