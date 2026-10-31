@@ -18,7 +18,7 @@ const ICONS = {
 
 const TIERS = {
   bronze: { bg: '#fde3d6', fg: '#9a4d1f', label: 'Bronze' },
-  silver: { bg: '#e4e1fb', fg: '#4b3fa8', label: 'Silver' },
+  silver: { bg: '#EAE1F7', fg: '#5B3E9E', label: 'Silver' },
   gold: { bg: '#f6f0a8', fg: '#7a6200', label: 'Gold' },
 };
 

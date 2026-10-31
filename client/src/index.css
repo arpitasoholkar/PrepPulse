@@ -3,20 +3,38 @@
 @tailwind utilities;
 
 :root {
-  --ink: #1f1f38;
-  --ink-soft: #6b6b85;
-  --lime: #d9f26e;
-  --lav: #c4a8f7;
-  --paper: #f8f7f3;
+  --color-primary: #7652C8;
+  --color-primary-dark: #251D35;
+  --color-secondary: #F28A52;
+  --color-lavender: #EAE1F7;
+  --color-background: #FAF8F3;
+  --color-text: #292536;
+  --color-muted: #898394;
+  --color-white: #FFFFFF;
+
+  --ink: #292536;
+  --ink-soft: #898394;
+  --lime: #F28A52;
+  --lav: #EAE1F7;
+  --paper: #FAF8F3;
 }
 
 /* Compact density on desktop: Tailwind sizes are rem based, so lowering the root
    size shrinks the whole UI (text, padding, gaps, cards) proportionally. */
 @media (min-width: 1024px) {
-  html { font-size: 13px; }
+  /* scales with window height so the dashboard fits without a page scrollbar */
+  html { font-size: clamp(11px, 1.9vh, 17px); }
 }
-@media (min-width: 1024px) and (min-height: 900px) {
-  html { font-size: 14px; }
+
+/* Hide scrollbars everywhere; scrolling with wheel, touch and keyboard still works */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 body {
@@ -42,8 +60,9 @@ dialog::backdrop {
   .app-bg {
     background-color: var(--lav);
     background-image:
-      radial-gradient(50rem 30rem at 15% 0%, rgba(255, 255, 255, 0.28), transparent 60%),
-      radial-gradient(40rem 30rem at 100% 100%, rgba(124, 92, 255, 0.25), transparent 60%);
+      radial-gradient(50rem 30rem at 10% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+      radial-gradient(45rem 30rem at 100% 100%, rgba(118, 82, 200, 0.22), transparent 60%),
+      linear-gradient(160deg, #F1EAFB 0%, #E3D6F6 100%);
     background-attachment: fixed;
   }
 
@@ -56,14 +75,14 @@ dialog::backdrop {
   /* White card used for every panel */
   .glass {
     background: #fff;
-    border: 1px solid rgba(31, 31, 56, 0.05);
-    box-shadow: 0 1px 2px rgba(31, 31, 56, 0.04), 0 8px 24px -14px rgba(31, 31, 56, 0.16);
+    border: 1px solid rgba(37, 29, 53, 0.05);
+    box-shadow: 0 1px 2px rgba(37, 29, 53, 0.04), 0 8px 24px -14px rgba(37, 29, 53, 0.16);
   }
 
   .glass-strong {
     background: #fff;
-    border: 1px solid rgba(31, 31, 56, 0.08);
-    box-shadow: 0 18px 40px -12px rgba(31, 31, 56, 0.28);
+    border: 1px solid rgba(37, 29, 53, 0.08);
+    box-shadow: 0 18px 40px -12px rgba(37, 29, 53, 0.28);
   }
 
   /* Lime call-to-action */
@@ -75,7 +94,7 @@ dialog::backdrop {
   }
 
   .brand-gradient-text {
-    background-image: linear-gradient(90deg, #7c5cff, #14b8a6);
+    background-image: linear-gradient(90deg, #7652C8, #F28A52);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -88,12 +107,12 @@ dialog::backdrop {
     flex-shrink: 0;
     border-radius: 9999px;
     color: var(--ink);
-    background: rgba(31, 31, 56, 0.05);
-    border: 1px solid rgba(31, 31, 56, 0.08);
+    background: rgba(37, 29, 53, 0.05);
+    border: 1px solid rgba(37, 29, 53, 0.08);
     transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   }
   .bubble:hover {
-    background: rgba(31, 31, 56, 0.1);
+    background: rgba(37, 29, 53, 0.1);
   }
   .bubble-active,
   .bubble-active:hover {
@@ -107,8 +126,9 @@ dialog::backdrop {
     text-align: center;
     border-radius: 9999px;
     font-weight: 800;
-    color: var(--ink);
-    background-color: var(--lime);
+    color: #fff;
+    background-color: var(--color-secondary);
+    box-shadow: 0 10px 20px -10px rgba(242, 138, 82, 0.8);
     transition: filter 0.15s;
   }
   .btn-pill:hover {
@@ -117,8 +137,8 @@ dialog::backdrop {
 
   .orb {
     border-radius: 9999px;
-    background: radial-gradient(circle at 30% 30%, #fff, #c4a8f7 55%, #7c5cff);
-    box-shadow: 0 18px 40px rgba(124, 92, 255, 0.35);
+    background: radial-gradient(circle at 30% 30%, #fff, #EAE1F7 55%, #7652C8);
+    box-shadow: 0 18px 40px rgba(118, 82, 200, 0.35);
   }
 
   /* Dark sidebar */
@@ -138,10 +158,25 @@ dialog::backdrop {
   }
   .side-link-active,
   .side-link-active:hover {
-    background: var(--lime);
-    color: var(--ink);
+    background: var(--color-lavender);
+    color: var(--color-primary-dark);
     font-weight: 700;
   }
+  .side-link-active svg { color: var(--color-primary); }
+
+  /* Soft lavender chip used for suggestions and tags */
+  .chip-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    background: var(--color-lavender);
+    color: var(--color-text);
+    font-weight: 600;
+    transition: background-color 0.15s, transform 0.15s;
+  }
+  .chip-soft:hover { background: #dfd1f3; transform: translateY(-1px); }
+  .chip-soft svg { color: var(--color-primary); }
 }
 
 /*
@@ -156,39 +191,39 @@ dialog::backdrop {
 .skin-light [class*="bg-rose-"].text-white,
 .skin-light [class*="bg-gradient"].text-white,
 .skin-light [class*="bg-indigo-"][class*="text-indigo-100"] { color: #fff; }
-.skin-light .btn-pill { color: var(--ink); }
+.skin-light .btn-pill { color: #fff; }
 
 .skin-light .bg-white\/5,
 .skin-light .bg-white\/\[0\.03\],
-.skin-light .bg-white\/\[0\.04\] { background-color: rgba(31, 31, 56, 0.04); }
-.skin-light .bg-white\/10 { background-color: rgba(31, 31, 56, 0.07); }
-.skin-light .bg-white\/25 { background-color: rgba(31, 31, 56, 0.14); }
+.skin-light .bg-white\/\[0\.04\] { background-color: rgba(37, 29, 53, 0.04); }
+.skin-light .bg-white\/10 { background-color: rgba(37, 29, 53, 0.07); }
+.skin-light .bg-white\/25 { background-color: rgba(37, 29, 53, 0.14); }
 .skin-light .hover\:bg-white\/10:hover,
-.skin-light .hover\:bg-white\/\[0\.07\]:hover { background-color: rgba(31, 31, 56, 0.08); }
+.skin-light .hover\:bg-white\/\[0\.07\]:hover { background-color: rgba(37, 29, 53, 0.08); }
 
-.skin-light .border-white\/10 { border-color: rgba(31, 31, 56, 0.09); }
-.skin-light .border-white\/15 { border-color: rgba(31, 31, 56, 0.12); }
-.skin-light .border-white\/20 { border-color: rgba(31, 31, 56, 0.16); }
+.skin-light .border-white\/10 { border-color: rgba(37, 29, 53, 0.09); }
+.skin-light .border-white\/15 { border-color: rgba(37, 29, 53, 0.12); }
+.skin-light .border-white\/20 { border-color: rgba(37, 29, 53, 0.16); }
 
 /* Dark purple inputs and chat boxes become white fields */
 .skin-light [class*="bg-[#3b1d6e]"],
 .skin-light [class*="bg-[#4d2784]"] {
   background-color: #fff;
   color: var(--ink);
-  border-color: rgba(31, 31, 56, 0.14);
+  border-color: rgba(37, 29, 53, 0.14);
 }
 .skin-light input::placeholder,
 .skin-light textarea::placeholder { color: #9a9ab0; }
 .skin-light .bg-black\/30 { background-color: #f4f3f9; }
 .skin-light .shadow-black\/30,
-.skin-light .shadow-black\/20 { --tw-shadow-color: rgba(31, 31, 56, 0.18); }
+.skin-light .shadow-black\/20 { --tw-shadow-color: rgba(37, 29, 53, 0.18); }
 
 /* Memories panel: a card that just arrived flashes once so the change is visible */
 @keyframes memory-flash {
   0% {
     opacity: 0;
     transform: translateY(8px);
-    background-color: rgba(124, 92, 255, 0.4);
+    background-color: rgba(118, 82, 200, 0.4);
   }
   35% {
     opacity: 1;

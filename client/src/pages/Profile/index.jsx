@@ -107,7 +107,7 @@ export default function Profile() {
                   <h2 className="text-2xl font-extrabold tracking-tight text-ink truncate">{u?.name}</h2>
                   <p className="text-sm text-ink-soft truncate">{u?.email}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
-                    <span className="rounded-full bg-[#e4e1fb] px-3 py-1 text-[#4b3fa8]">{u?.targetRole || 'SDE'}</span>
+                    <span className="rounded-full bg-[#EAE1F7] px-3 py-1 text-[#5B3E9E]">{u?.targetRole || 'SDE'}</span>
                     <span className="rounded-full bg-[#f1f0f6] px-3 py-1 text-ink-soft">Joined {u?.createdAt ? prettyDate(String(u.createdAt).slice(0, 10)) : 'recently'}</span>
                     <span className="rounded-full bg-[#eaf6b8] px-3 py-1 text-[#4d6600]">{profile.badgesEarned}/{profile.badgesTotal} badges</span>
                   </div>
@@ -123,7 +123,7 @@ export default function Profile() {
           <section className="grid grid-cols-2 xl:grid-cols-4 gap-4" aria-label="Stats">
             <Stat icon={Flame} label="Current streak" value={profile.streak.current} unit={profile.streak.current === 1 ? 'day' : 'days'} bg="#fde3d6" fg="#c2562a" />
             <Stat icon={Trophy} label="Longest streak" value={profile.streak.longest} unit={profile.streak.longest === 1 ? 'day' : 'days'} bg="#fdeccd" fg="#a86a00" />
-            <Stat icon={Clock} label="Time learning" value={hoursFromMinutes(t.minutes)} unit="h" bg="#e4e1fb" fg="#4b3fa8" />
+            <Stat icon={Clock} label="Time learning" value={hoursFromMinutes(t.minutes)} unit="h" bg="#EAE1F7" fg="#5B3E9E" />
             <Stat icon={CircleCheck} label={`Passed · ${t.passRate}% pass rate`} value={t.passes} bg="#eaf6b8" fg="#5f7a00" />
           </section>
 
@@ -148,7 +148,7 @@ export default function Profile() {
                           ) : (
                             <>
                               <span className="h-1.5 flex-1 rounded-full bg-[#ececf2] overflow-hidden">
-                                <span className="block h-full rounded-full bg-[#7c5cff]" style={{ width: `${(b.progress / b.target) * 100}%` }} />
+                                <span className="block h-full rounded-full bg-[#7652C8]" style={{ width: `${(b.progress / b.target) * 100}%` }} />
                               </span>
                               <span className="text-[11px] font-semibold text-ink-soft tabular-nums">{b.progress}/{b.target}</span>
                             </>

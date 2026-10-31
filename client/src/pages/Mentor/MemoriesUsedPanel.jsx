@@ -1,5 +1,6 @@
 import React from 'react';
-import { Brain, Sparkles, Pencil } from 'lucide-react';
+import { Brain, Bookmark, Pencil } from 'lucide-react';
+import { Sparkle, Leaves } from '../../components/Illustrations.jsx';
 import { getTypeStyle } from '../../components/memoryStyles.js';
 
 function ConfidenceBar({ value, barClass }) {
@@ -69,8 +70,9 @@ function MemoryCard({ memory, why, score, tag, animate }) {
 
 export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasReply, degraded }) {
   return (
-    <aside aria-label="Memories used" className="flex flex-col min-h-0 h-full">
-      <div className="px-5 py-4 border-b border-white/10 flex items-center gap-2.5">
+    <aside aria-label="Memories used" className="relative flex flex-col min-h-0 h-full">
+      <Leaves className="pointer-events-none absolute -right-6 bottom-0 w-44 h-60 opacity-80" />
+      <div className="relative px-5 py-4 border-b border-[#ececf2] flex items-center gap-2.5">
         <span className="bubble w-9 h-9">
           <Brain className="w-4 h-4" />
         </span>
@@ -78,7 +80,7 @@ export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasR
         {loading && <span className="ml-auto text-xs text-slate-500">Updating…</span>}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-7">
+      <div className="relative flex-1 overflow-y-auto p-5 space-y-7">
         <section aria-label="Memories used for this reply">
           {used.length > 0 ? (
             <>
@@ -99,7 +101,9 @@ export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasR
               </ul>
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-white/15 p-4 text-base text-slate-400">
+            <div className="flex items-start gap-3 rounded-2xl border border-[#F28A52]/25 bg-[#fde3d6]/60 p-4 text-base text-ink">
+              <Sparkle className="w-6 h-6 shrink-0 mt-0.5" />
+              <div>
               {hasReply ? (
                 <>
                   <p className="text-slate-200 font-semibold">No stored memory matched this reply.</p>
@@ -112,13 +116,14 @@ export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasR
               ) : (
                 'No memories used yet. Ask the mentor something.'
               )}
+              </div>
             </div>
           )}
         </section>
 
         <section aria-label="Saved just now">
           <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5 mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+            <Bookmark className="w-4 h-4 text-[#7652C8] fill-[#7652C8]/20" />
             Saved just now
           </h3>
           {saved.length > 0 ? (
@@ -133,8 +138,8 @@ export default function MemoriesUsedPanel({ used, saved, loading, replyKey, hasR
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-500 flex items-start gap-1.5">
-              <Pencil className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <p className="text-sm text-ink-soft flex items-start gap-2">
+              <Pencil className="w-4 h-4 mt-0.5 shrink-0" />
               New memories from this session appear here, for example after you click "I understood".
             </p>
           )}

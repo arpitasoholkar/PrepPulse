@@ -284,52 +284,38 @@ export default function Vault() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Top Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-indigo-950/60 border border-indigo-800/80 rounded-xl text-indigo-400">
-                <Brain className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Memory Vault
-                </h1>
-                <p className="text-sm text-slate-400 mt-0.5">
-                  AI-extracted strengths, weaknesses, mistakes, and learning preferences scoped to your profile.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchVaultMemories}
-              disabled={loading}
-              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-              title="Refresh memories"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
-          </div>
+      <div className="w-full pb-4">
+        {/* Intro row (the page title is already in the main header) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+          <p className="text-base text-ink-soft">
+            AI-extracted strengths, weaknesses, mistakes, and learning preferences scoped to your profile.
+          </p>
+          <button
+            onClick={fetchVaultMemories}
+            disabled={loading}
+            className="inline-flex items-center gap-2 self-start md:self-auto px-5 py-2.5 text-sm font-semibold rounded-full bg-white text-ink border border-[#ececf2] shadow-sm hover:bg-[#f6f5fa] transition"
+            title="Refresh memories"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
         </div>
 
+        <div className="glass rounded-[28px] p-5 mb-5">
         {/* Status Bar / Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-3 rounded-xl mb-6 backdrop-blur">
-          <div className="flex items-center space-x-1 bg-slate-950/70 p-1 rounded-lg border border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-[#f6f5fa] p-2 rounded-2xl mb-5">
+          <div className="flex items-center space-x-1 bg-white p-1 rounded-full border border-[#ececf2]">
             <button
               onClick={() => setSelectedStatus('active')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center space-x-2 ${
+              className={`px-4 py-2 text-sm font-semibold rounded-full transition flex items-center space-x-2 ${
                 selectedStatus === 'active'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-[#7652C8] !text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <span>Active</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                selectedStatus === 'active' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
+              <span className={`px-1.5 py-0.2 rounded-full text-xs ${
+                selectedStatus === 'active' ? 'bg-[#5B3E9E] !text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {counts.active}
               </span>
@@ -337,15 +323,15 @@ export default function Vault() {
 
             <button
               onClick={() => setSelectedStatus('corrected')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center space-x-2 ${
+              className={`px-4 py-2 text-sm font-semibold rounded-full transition flex items-center space-x-2 ${
                 selectedStatus === 'corrected'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-[#7652C8] !text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <span>Corrected</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                selectedStatus === 'corrected' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
+              <span className={`px-1.5 py-0.2 rounded-full text-xs ${
+                selectedStatus === 'corrected' ? 'bg-[#5B3E9E] !text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {counts.corrected}
               </span>
@@ -353,15 +339,15 @@ export default function Vault() {
 
             <button
               onClick={() => setSelectedStatus('superseded')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center space-x-2 ${
+              className={`px-4 py-2 text-sm font-semibold rounded-full transition flex items-center space-x-2 ${
                 selectedStatus === 'superseded'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-[#7652C8] !text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <span>Superseded</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                selectedStatus === 'superseded' ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
+              <span className={`px-1.5 py-0.2 rounded-full text-xs ${
+                selectedStatus === 'superseded' ? 'bg-[#5B3E9E] !text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {counts.superseded}
               </span>
@@ -369,9 +355,9 @@ export default function Vault() {
 
             <button
               onClick={() => setSelectedStatus('all')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+              className={`px-4 py-2 text-sm font-semibold rounded-full transition ${
                 selectedStatus === 'all'
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-[#7652C8] !text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -381,13 +367,13 @@ export default function Vault() {
 
           {/* Quick Search */}
           <div className="relative min-w-[240px] flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search content or evidence..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950/80 border border-slate-800 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+              className="w-full bg-white border border-[#ececf2] rounded-full pl-10 pr-9 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#7652C8] focus:ring-1 focus:ring-[#7652C8] transition"
             />
             {searchQuery && (
               <button
@@ -402,7 +388,7 @@ export default function Vault() {
 
         {/* Filter Chips by Type */}
         <div className="mb-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
             <Filter className="w-3 h-3 text-slate-400" />
             <span>Filter by Type</span>
           </div>
@@ -413,9 +399,9 @@ export default function Vault() {
                 <button
                   key={t.id}
                   onClick={() => setSelectedType(t.id)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition border ${
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition border ${
                     active
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                      ? 'bg-[#7652C8] !text-white border-[#7652C8] shadow-sm'
                       : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white'
                   }`}
                 >
@@ -428,7 +414,7 @@ export default function Vault() {
 
         {/* Filter Chips by Topic */}
         <div className="mb-6">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
             <Sparkles className="w-3 h-3 text-slate-400" />
             <span>Filter by Topic</span>
           </div>
@@ -439,9 +425,9 @@ export default function Vault() {
                 <button
                   key={topic}
                   onClick={() => setSelectedTopic(topic)}
-                  className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition border capitalize ${
+                  className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition border capitalize ${
                     active
-                      ? 'bg-slate-200 text-slate-900 border-slate-200 font-semibold shadow-sm'
+                      ? 'bg-[#251D35] !text-white border-[#251D35] font-semibold shadow-sm'
                       : 'bg-slate-900/50 text-slate-400 border-slate-800/80 hover:bg-slate-800 hover:text-slate-200'
                   }`}
                 >
@@ -450,6 +436,8 @@ export default function Vault() {
               );
             })}
           </div>
+        </div>
+
         </div>
 
         {/* Active Filters Bar */}
@@ -477,7 +465,7 @@ export default function Vault() {
                 setSelectedTopic('all');
                 setSearchQuery('');
               }}
-              className="ml-auto text-indigo-400 hover:underline flex items-center gap-1 font-medium"
+              className="ml-auto text-[#7652C8] hover:underline flex items-center gap-1 font-medium"
             >
               Clear filters
             </button>
@@ -487,7 +475,7 @@ export default function Vault() {
         {/* Content Area */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-            <RefreshCw className="w-8 h-8 animate-spin text-indigo-400 mb-3" />
+            <RefreshCw className="w-8 h-8 animate-spin text-[#7652C8] mb-3" />
             <p className="text-sm">Accessing Memory Vault...</p>
           </div>
         ) : error ? (
@@ -513,7 +501,7 @@ export default function Vault() {
                   setSelectedTopic('all');
                   setSearchQuery('');
                 }}
-                className="mt-4 px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition"
+                className="mt-4 px-3 py-1.5 text-xs bg-[#7652C8] hover:brightness-110 !text-white rounded-lg font-medium transition"
               >
                 Reset to Active Memories
               </button>
@@ -607,7 +595,7 @@ export default function Vault() {
                             rows={3}
                             value={editForm.content}
                             onChange={(e) => setEditForm(prev => ({ ...prev, content: e.target.value }))}
-                            className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:outline-none focus:border-[#7652C8]"
                           />
                         </div>
 
@@ -617,7 +605,7 @@ export default function Vault() {
                             <select
                               value={editForm.topic}
                               onChange={(e) => setEditForm(prev => ({ ...prev, topic: e.target.value }))}
-                              className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 capitalize"
+                              className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-[#7652C8] capitalize"
                             >
                               {TOPICS.filter(t => t !== 'all').map(t => (
                                 <option key={t} value={t}>{t}</option>
@@ -630,7 +618,7 @@ export default function Vault() {
                             <select
                               value={editForm.type}
                               onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value }))}
-                              className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-[#7652C8]"
                             >
                               {MEMORY_TYPES.filter(t => t.id !== 'all').map(t => (
                                 <option key={t.id} value={t.id}>{t.label}</option>
@@ -650,7 +638,7 @@ export default function Vault() {
                             step="0.05"
                             value={editForm.confidence}
                             onChange={(e) => setEditForm(prev => ({ ...prev, confidence: parseFloat(e.target.value) }))}
-                            className="w-full accent-indigo-500"
+                            className="w-full accent-[#7652C8]"
                           />
                         </div>
 
@@ -662,7 +650,7 @@ export default function Vault() {
                             type="datetime-local"
                             value={editForm.expiresAt}
                             onChange={(e) => setEditForm(prev => ({ ...prev, expiresAt: e.target.value }))}
-                            className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white focus:outline-none focus:border-[#7652C8]"
                           />
                         </div>
 
@@ -679,7 +667,7 @@ export default function Vault() {
                             type="button"
                             onClick={() => saveEdit(memory._id)}
                             disabled={savingEdit}
-                            className="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium transition"
+                            className="px-3 py-1 text-xs bg-[#7652C8] hover:brightness-110 !text-white rounded font-medium transition"
                           >
                             {savingEdit ? 'Saving...' : 'Save Correction'}
                           </button>
@@ -732,7 +720,7 @@ export default function Vault() {
                       {evidenceCount > 0 && (
                         <button
                           onClick={() => toggleEvidence(memory._id)}
-                          className="flex items-center space-x-1 text-indigo-400 hover:text-indigo-300 font-medium transition"
+                          className="flex items-center space-x-1 text-[#7652C8] hover:text-[#5B3E9E] font-medium transition"
                         >
                           <span>Evidence ({evidenceCount})</span>
                           {isEvidenceExpanded ? (

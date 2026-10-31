@@ -43,7 +43,7 @@ export default function MessageBubble({
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-[28px] rounded-br-lg bg-gradient-to-br from-[#6d3fd0] to-[#43208a] text-white px-4 py-2.5 text-base font-medium whitespace-pre-wrap shadow-lg shadow-violet-950/40">
+        <div className="max-w-[85%] rounded-[24px] rounded-br-md bg-gradient-to-br from-[#7652C8] to-[#5B3E9E] text-white px-4 py-2.5 text-base font-medium whitespace-pre-wrap shadow-lg shadow-[#7652C8]/30">
           {message.content}
         </div>
       </div>
@@ -56,7 +56,7 @@ export default function MessageBubble({
     <div className="flex justify-start">
       <div
         onClick={onSelect}
-        className={`max-w-[94%] w-full rounded-[28px] rounded-bl-lg glass px-5 py-4 cursor-pointer transition ${
+        className={`max-w-[94%] w-full rounded-[24px] rounded-bl-md glass px-5 py-4 cursor-pointer transition ${
           selected ? '!border-violet-400/60 ring-1 ring-violet-400/30' : 'hover:!border-white/20'
         }`}
       >

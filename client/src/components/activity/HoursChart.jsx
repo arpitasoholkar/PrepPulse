@@ -38,20 +38,20 @@ export default function HoursChart({ week, className = '' }) {
       </div>
 
       <div className="mt-3 flex gap-3">
-        <div className="relative h-[130px] w-8 shrink-0 text-xs font-semibold text-ink-soft" aria-hidden="true">
+        <div className="relative h-[10rem] w-8 shrink-0 text-xs font-semibold text-ink-soft" aria-hidden="true">
           {ticks.map((t, i) => (
             <span key={t} className="absolute right-0 -translate-y-1/2" style={{ top: `${(i / 4) * 100}%` }}>{t}h</span>
           ))}
         </div>
 
         <div className="relative flex-1 min-w-0">
-          <div className="absolute inset-x-0 top-0 h-[130px]" aria-hidden="true">
+          <div className="absolute inset-x-0 top-0 h-[10rem]" aria-hidden="true">
             {ticks.map((t, i) => (
               <div key={t} className="absolute inset-x-0 border-t border-[#ececf2]" style={{ top: `${(i / 4) * 100}%` }} />
             ))}
           </div>
 
-          <div className="relative h-[130px] flex items-end justify-between gap-2 px-1" onMouseLeave={() => setHover(null)}>
+          <div className="relative h-[10rem] flex items-end justify-between gap-2 px-1" onMouseLeave={() => setHover(null)}>
             {days.map((d, i) => {
               const pct = d.minutes > 0 ? Math.max(3, (d.minutes / axisMax) * 100) : 0;
               const isActive = i === active;
@@ -66,7 +66,7 @@ export default function HoursChart({ week, className = '' }) {
                   className="relative flex-1 h-full flex items-end justify-center focus:outline-none group"
                 >
                   {isActive && activeDay && (
-                    <span className={`pointer-events-none absolute z-10 -translate-y-2 whitespace-nowrap ${i >= days.length - 2 ? 'right-0' : i <= 1 ? 'left-0' : 'left-1/2 -translate-x-1/2'} rounded-xl bg-[#1f1f38] px-3 py-1.5 text-[11px] font-semibold text-[#fff] shadow-lg`}
+                    <span className={`pointer-events-none absolute z-10 -translate-y-2 whitespace-nowrap ${i >= days.length - 2 ? 'right-0' : i <= 1 ? 'left-0' : 'left-1/2 -translate-x-1/2'} rounded-xl bg-[#251D35] px-3 py-1.5 text-[11px] font-semibold text-[#fff] shadow-lg`}
                       style={{ bottom: `calc(${pct}% + 4px)` }}>
                       <span className="block font-extrabold">{formatMinutes(d.minutes)}</span>
                       <span className="block text-[#fff]/60">{prettyDate(d.day)}</span>
@@ -74,7 +74,7 @@ export default function HoursChart({ week, className = '' }) {
                   )}
                   <span
                     className={`block w-[10px] rounded-full transition-all ${
-                      isActive ? 'bg-[#d9f26e]' : d.future ? 'bg-[#ececf2]' : 'bg-[#1f1f38]'
+                      isActive ? 'bg-[#F28A52]' : d.future ? 'bg-[#ececf2]' : 'bg-[#251D35]'
                     } group-focus-visible:ring-2 group-focus-visible:ring-violet-400`}
                     style={{ height: d.minutes > 0 ? `${pct}%` : '6px', opacity: d.minutes > 0 || d.future ? 1 : 0.18 }}
                   />

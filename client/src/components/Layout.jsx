@@ -18,9 +18,9 @@ export default function Layout({ children, bare = false }) {
 
   return (
     <RequireUser>
-        <div className="min-h-screen app-bg text-ink font-sans p-2 sm:p-3 lg:p-6">
+        <div className="min-h-screen app-bg text-ink font-sans p-2 sm:p-3 lg:p-3">
           <ColdStartBanner />
-          <div className="app-shell mx-auto max-w-[1800px] rounded-[28px] lg:rounded-[44px] p-3 sm:p-4 lg:p-6 lg:flex lg:gap-7 lg:items-start min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-3rem)]">
+          <div className="app-shell mx-auto max-w-[1800px] rounded-[28px] lg:rounded-[44px] p-3 sm:p-4 lg:p-4 lg:flex lg:gap-5 lg:items-start min-h-[calc(100vh-1rem)] lg:min-h-[calc(100vh-1.5rem)]">
             <Navbar />
             <div className="skin-light flex-1 min-w-0 flex flex-col gap-4 lg:gap-4 pt-1">
               <Header />

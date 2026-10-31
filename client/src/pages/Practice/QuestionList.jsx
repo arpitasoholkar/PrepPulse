@@ -9,7 +9,7 @@ const DIFFICULTY = {
 
 export default function QuestionList({ questions, selectedId, onSelect }) {
   return (
-    <ul className="space-y-2.5" aria-label="Practice questions">
+    <ul className="space-y-3 min-h-0 lg:overflow-y-auto lg:pr-1" aria-label="Practice questions">
       {questions.map((q) => {
         const active = q.id === selectedId;
         return (
@@ -18,10 +18,10 @@ export default function QuestionList({ questions, selectedId, onSelect }) {
               type="button"
               onClick={() => onSelect(q.id)}
               aria-current={active ? 'true' : undefined}
-              className={`w-full text-left rounded-[28px] border px-5 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+              className={`w-full text-left rounded-[24px] border px-5 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
                 active
-                  ? 'border-violet-300/50 bg-[#4d2784]/70 ring-1 ring-violet-300/30'
-                  : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.07]'
+                  ? 'border-[#7652C8]/50 bg-white ring-2 ring-[#7652C8]/25 shadow-sm'
+                  : 'border-[#ececf2] bg-white/70 hover:bg-white'
               }`}
             >
               <div className="flex items-center gap-2">

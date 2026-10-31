@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import UserMenu from './UserMenu.jsx';
+import { TitleDecor } from './Illustrations.jsx';
 import { useUser } from '../context/UserContext.jsx';
 
 const PAGES = {
@@ -39,13 +40,15 @@ export default function Header() {
         {!isHome && page.subtitle && <p className="hidden lg:block text-sm text-ink-soft truncate">{page.subtitle}</p>}
       </div>
 
+      {!isHome && <TitleDecor className="hidden xl:block w-28 h-12 shrink-0 -mt-1" />}
+
       <form onSubmit={submit} role="search" className="hidden md:flex items-center gap-3 w-[300px] xl:w-[330px] rounded-full bg-white border border-[#ececf2] px-5 h-[46px] shadow-sm focus-within:ring-2 focus-within:ring-violet-400">
         <Search className="w-5 h-5 text-ink-soft shrink-0" aria-hidden="true" />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ask the mentor a question"
+          placeholder="Ask the mentor a question…"
           aria-label="Ask the mentor a question"
           className="w-full bg-transparent text-sm text-ink placeholder:text-ink-soft focus:outline-none"
         />

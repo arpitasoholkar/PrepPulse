@@ -22,7 +22,7 @@ const TOPIC_ICONS = {
 const TILE_COLORS = [
   { bg: '#fde3d6', fg: '#c2562a' },
   { bg: '#eaf6b8', fg: '#5f7a00' },
-  { bg: '#e4e1fb', fg: '#4b3fa8' },
+  { bg: '#EAE1F7', fg: '#5B3E9E' },
   { bg: '#fdeccd', fg: '#a86a00' },
 ];
 const tile = (i) => TILE_COLORS[i % TILE_COLORS.length];
@@ -108,7 +108,7 @@ export default function Dashboard() {
   // Weakest first: that is what to practise next
   const byWeakness = useMemo(() => [...mastery].sort((a, b) => a.score - b.score), [mastery]);
   const next3 = byWeakness.slice(0, 3);
-  const rows = showAll ? byWeakness : byWeakness.slice(0, 3);
+  const rows = showAll ? byWeakness : byWeakness.slice(0, 2);
 
   const streak = summary?.streak;
   const badges = summary?.badges || [];
@@ -184,7 +184,7 @@ export default function Dashboard() {
                           ) : (
                             <div className="mt-1.5 flex items-center gap-2">
                               <span className="h-1.5 flex-1 rounded-full bg-[#ececf2] overflow-hidden">
-                                <span className="block h-full rounded-full bg-[#7c5cff]" style={{ width: `${(b.progress / b.target) * 100}%` }} />
+                                <span className="block h-full rounded-full bg-[#7652C8]" style={{ width: `${(b.progress / b.target) * 100}%` }} />
                               </span>
                               <span className="text-[11px] font-semibold text-ink-soft tabular-nums">{b.progress}/{b.target}</span>
                             </div>
@@ -206,13 +206,13 @@ export default function Dashboard() {
                     <button type="button" onClick={() => setShowAll((v) => !v)} className="rounded-full border border-[#ececf2] bg-white px-4 py-2 text-sm font-semibold text-ink-soft hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">
                       {showAll ? 'Weakest first' : `Show all ${byWeakness.length}`}
                     </button>
-                    <Link to="/practice" aria-label="Practice" className="grid place-items-center w-9 h-9 rounded-full bg-[#d9f26e] text-ink"><Plus className="w-4 h-4" /></Link>
+                    <Link to="/practice" aria-label="Practice" className="grid place-items-center w-9 h-9 rounded-full bg-[#F28A52] text-ink"><Plus className="w-4 h-4" /></Link>
                   </div>
                 }
               >
                 Topic Mastery
               </SectionTitle>
-              <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {rows.map((m, i) => {
                   const t = TIER(m.score);
                   const trend = m.trend || [];
@@ -246,9 +246,9 @@ export default function Dashboard() {
 
           {/* ---------- Right column ---------- */}
           <div className="min-w-0 flex flex-col gap-4">
-            <section className="relative overflow-hidden rounded-[24px] bg-[#1f1f38] p-5 text-[#fff]" aria-label="Streak">
-              <span className="pointer-events-none absolute -right-8 -top-8 w-40 h-40 rounded-full bg-[#7c5cff]/30" aria-hidden="true" />
-              <span className="pointer-events-none absolute right-10 bottom-4 w-16 h-16 rounded-full bg-[#d9f26e]/20" aria-hidden="true" />
+            <section className="relative overflow-hidden rounded-[24px] bg-[#251D35] p-5 text-[#fff]" aria-label="Streak">
+              <span className="pointer-events-none absolute -right-8 -top-8 w-40 h-40 rounded-full bg-[#7652C8]/30" aria-hidden="true" />
+              <span className="pointer-events-none absolute right-10 bottom-4 w-16 h-16 rounded-full bg-[#F28A52]/20" aria-hidden="true" />
               <div className="relative flex items-center gap-2 text-sm font-semibold text-[#fff]/70">
                 <Flame className="w-4 h-4 text-[#ff9b54]" /> Learning streak
               </div>
@@ -261,7 +261,7 @@ export default function Dashboard() {
               <p className="relative mt-3 text-sm text-[#fff]/80 max-w-[16rem]">
                 {streak?.activeToday ? 'Today is counted. Come back tomorrow to keep it going.' : 'Solve a question or ask the mentor to count today.'}
               </p>
-              <Link to="/practice" className="relative mt-3 inline-block rounded-full bg-[#d9f26e] px-5 py-2 text-sm font-extrabold text-[#1f1f38] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+              <Link to="/practice" className="relative mt-3 inline-block rounded-full bg-[#F28A52] px-5 py-2 text-sm font-extrabold text-[#251D35] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
                 Practice now
               </Link>
             </section>
@@ -271,10 +271,10 @@ export default function Dashboard() {
             <section aria-label="Recent attempts">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-2xl font-extrabold tracking-tight text-ink">Recent Attempts</h2>
-                <Link to="/practice" aria-label="New attempt" className="grid place-items-center w-9 h-9 rounded-full bg-[#d9f26e] text-ink"><Plus className="w-4 h-4" /></Link>
+                <Link to="/practice" aria-label="New attempt" className="grid place-items-center w-9 h-9 rounded-full bg-[#F28A52] text-ink"><Plus className="w-4 h-4" /></Link>
               </div>
               <div className="flex flex-col gap-2">
-                {attempts.slice(0, 3).map((a, i) => {
+                {attempts.slice(0, 2).map((a, i) => {
                   const pass = a.result === 'pass';
                   const err = a.result === 'error';
                   return (
@@ -286,7 +286,7 @@ export default function Dashboard() {
                         <p className="font-bold text-ink truncate">{prettyQuestion(a.questionId)}</p>
                         <p className="text-xs text-ink-soft">{formatAttemptDate(a.timestamp)} · {a.testsPassed}/{a.testsTotal} tests</p>
                       </div>
-                      <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${pass ? 'bg-[#eaf6b8] text-[#4d6600]' : err ? 'bg-[#e4e1fb] text-[#4b3fa8]' : 'bg-[#fde3d6] text-[#b4441f]'}`}>
+                      <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${pass ? 'bg-[#eaf6b8] text-[#4d6600]' : err ? 'bg-[#EAE1F7] text-[#5B3E9E]' : 'bg-[#fde3d6] text-[#b4441f]'}`}>
                         {pass ? 'Passed' : err ? 'Error' : 'Failed'}
                       </span>
                     </div>

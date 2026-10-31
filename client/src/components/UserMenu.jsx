@@ -7,7 +7,7 @@ import { resetDemo } from '../api/dashboard.js';
 export function Avatar({ name, size = 'w-12 h-12 text-base' }) {
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
   return (
-    <span className={`grid place-items-center shrink-0 rounded-full bg-gradient-to-br from-[#c4a8f7] to-[#7c5cff] font-extrabold text-white ${size}`}>
+    <span className={`grid place-items-center shrink-0 rounded-full bg-gradient-to-br from-[#EAE1F7] to-[#7652C8] font-extrabold text-white ${size}`}>
       {initial}
     </span>
   );

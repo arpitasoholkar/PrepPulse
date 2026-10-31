@@ -82,8 +82,8 @@ export default function ActivityCalendar({ className = '' }) {
               <span
                 title={label}
                 className={`grid place-items-center w-8 h-8 rounded-full text-sm ${
-                  isToday ? 'bg-[#d9f26e] font-extrabold text-ink'
-                    : active ? 'bg-[#e4e1fb] font-bold text-[#4b3fa8]'
+                  isToday ? 'bg-[#F28A52] font-extrabold text-ink'
+                    : active ? 'bg-[#EAE1F7] font-bold text-[#5B3E9E]'
                       : future ? 'text-[#c4c4d2]' : 'text-ink'
                 }`}
               >
@@ -95,8 +95,8 @@ export default function ActivityCalendar({ className = '' }) {
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#ececf2] pt-3 text-xs text-ink-soft">
-        <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-full bg-[#e4e1fb]" />{activeDays} active {activeDays === 1 ? 'day' : 'days'}</span>
-        <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-full bg-[#d9f26e]" />Today</span>
+        <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-full bg-[#EAE1F7]" />{activeDays} active {activeDays === 1 ? 'day' : 'days'}</span>
+        <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-full bg-[#F28A52]" />Today</span>
         <span className="font-semibold text-ink">{formatMinutes(minutes)}</span>
       </div>
     </section>

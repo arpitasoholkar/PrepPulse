@@ -107,7 +107,7 @@ export default function Practice() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
 
         {error && (
           <ErrorBanner
@@ -141,7 +141,7 @@ export default function Practice() {
             </button>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-[320px_minmax(0,1fr)] gap-4 lg:gap-5 items-start">
+          <div className="grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] gap-4 lg:gap-5 lg:h-[calc(100vh-10.5rem)]">
             <QuestionList
               questions={questions}
               selectedId={selectedId}
@@ -152,7 +152,7 @@ export default function Practice() {
             />
 
             {question && (
-              <div className="glass rounded-[32px] p-5 lg:p-6 min-w-0">
+              <div className="glass rounded-[28px] p-5 lg:p-6 min-w-0 min-h-0 flex flex-col lg:overflow-y-auto">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-bold text-white">{question.title}</h2>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full border border-white/15 bg-white/5 text-slate-300">
@@ -175,9 +175,9 @@ export default function Practice() {
                   spellCheck={false}
                   autoCapitalize="off"
                   autoCorrect="off"
-                  rows={14}
+                  rows={10}
                   disabled={submitting}
-                  className="mt-4 w-full resize-y rounded-3xl border border-white/10 bg-black/30 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 disabled:opacity-60"
+                  className="mt-4 w-full flex-1 min-h-[12rem] resize-none rounded-3xl border border-white/10 bg-black/30 p-4 font-mono text-[0.95rem] leading-relaxed text-slate-100 placeholder-slate-600 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 disabled:opacity-60"
                 />
 
                 <div className="mt-3 flex flex-wrap items-center gap-3">

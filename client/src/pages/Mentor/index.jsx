@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Send, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Send, RefreshCw, CheckCircle2, Code2, Network, Search } from 'lucide-react';
 import Layout from '../../components/Layout.jsx';
 import { useUser } from '../../context/UserContext.jsx';
 import ErrorBanner from '../../components/ErrorBanner.jsx';
@@ -9,8 +9,13 @@ import { getErrorMessage } from '../../api/client.js';
 import { sendMessage, sendFeedback } from '../../api/chat.js';
 import MessageBubble from './MessageBubble.jsx';
 import MemoriesUsedPanel from './MemoriesUsedPanel.jsx';
+import { MentorOrb } from '../../components/Illustrations.jsx';
 
-const SUGGESTIONS = ['Explain recursion', 'Teach me DFS', 'Explain binary search'];
+const SUGGESTIONS = [
+  { text: 'Explain recursion', icon: Code2 },
+  { text: 'Teach me DFS', icon: Network },
+  { text: 'Explain binary search', icon: Search },
+];
 
 const uid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -179,10 +184,10 @@ export default function Mentor() {
 
   return (
     <Layout>
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 lg:gap-5 lg:h-[calc(100vh-12.5rem)] lg:overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 lg:gap-5 lg:h-[calc(100vh-10.5rem)] lg:overflow-hidden">
         {/* Chat column */}
-        <section className="glass rounded-[32px] flex flex-col min-h-[75vh] lg:min-h-0 min-w-0 overflow-hidden">
-          <header className="flex items-center gap-3 px-6 py-4 border-b border-white/10">
+        <section className="glass rounded-[28px] flex flex-col min-h-[75vh] lg:min-h-0 min-w-0 overflow-hidden">
+          <header className="flex items-center gap-3 px-6 py-4 border-b border-[#ececf2]">
             <div className="min-w-0">
               <p className="text-base font-bold text-white">Chat</p>
               <p className="text-sm text-slate-500 truncate">
@@ -193,7 +198,7 @@ export default function Mentor() {
               type="button"
               onClick={handleNewSession}
               disabled={loading}
-              className="ml-auto inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold border border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:opacity-50 transition"
+              className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border border-[#ececf2] bg-white text-ink shadow-sm hover:bg-[#f6f5fa] focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:opacity-50 transition"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               New session
@@ -202,22 +207,23 @@ export default function Mentor() {
 
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4" aria-live="polite">
             {messages.length === 0 && !loading && (
-              <div className="max-w-xl mx-auto mt-10 text-center">
-                <div className="orb w-28 h-28 mx-auto mb-6" aria-hidden="true" />
+              <div className="max-w-xl mx-auto mt-4 text-center">
+                <MentorOrb className="w-52 h-40 mx-auto mb-3" />
                 <h2 className="text-2xl font-extrabold text-white">Hi {firstName}, what shall we learn today?</h2>
                 <p className="text-base text-slate-400 mt-1">
                   The mentor adapts to what it remembers about you. The panel on the right shows exactly which
                   memories it used.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2 mt-5">
-                  {SUGGESTIONS.map((s) => (
+                  {SUGGESTIONS.map(({ text, icon: Icon }) => (
                     <button
-                      key={s}
+                      key={text}
                       type="button"
-                      onClick={() => handleSend(s)}
-                      className="px-5 py-2.5 rounded-full text-base font-bold border border-white/10 bg-white/5 text-slate-200 hover:border-violet-400/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 transition"
+                      onClick={() => handleSend(text)}
+                      className="chip-soft px-5 py-2.5 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7652C8]"
                     >
-                      {s}
+                      <Icon className="w-4 h-4" />
+                      {text}
                     </button>
                   ))}
                 </div>
@@ -250,27 +256,27 @@ export default function Mentor() {
 
           {error && <ErrorBanner error={error} onDismiss={() => setError(null)} className="mx-6 mb-2" />}
 
-          <div className="px-6 pb-5 pt-4 border-t border-white/10">
-            <div className="flex items-end gap-2">
+          <div className="px-6 pb-4 pt-3 border-t border-[#ececf2]">
+            <div className="flex items-center gap-3">
               <label htmlFor="mentor-input" className="sr-only">
                 Message the mentor
               </label>
               <textarea
                 id="mentor-input"
                 ref={inputRef}
-                rows={2}
+                rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={loading}
                 placeholder="Ask the mentor, for example: Explain recursion"
-                className="flex-1 resize-none rounded-[28px] border border-white/10 bg-[#3b1d6e]/70 px-5 py-3 text-base text-white placeholder-violet-200/50 focus:outline-none focus:border-violet-300 focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
+                className="flex-1 resize-none rounded-full border border-[#ececf2] bg-white px-6 py-3 text-base text-ink shadow-sm placeholder:text-ink-soft focus:outline-none focus:border-[#7652C8] focus:ring-2 focus:ring-[#7652C8]/30 disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={() => handleSend()}
                 disabled={loading || !input.trim()}
-                className="inline-flex items-center gap-1.5 h-11 px-5 btn-pill text-base shadow-lg shadow-black/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="inline-flex items-center gap-2 h-12 px-6 btn-pill text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7652C8] disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 <Send className="w-4 h-4" />
                 Send
@@ -281,7 +287,7 @@ export default function Mentor() {
         </section>
 
         {/* Memories used panel */}
-        <div className="glass rounded-[32px] min-h-[40vh] lg:min-h-0 overflow-hidden">
+        <div className="glass relative rounded-[28px] min-h-[40vh] lg:min-h-0 overflow-hidden">
         <MemoriesUsedPanel
           used={shownAi?.memoriesUsed || []}
           saved={saved}
